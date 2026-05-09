@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="manifest" href="/manifest.json" />
   <title>デイサービス 送迎表</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#1e3a5f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="送迎表" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
-  <meta name="theme-color" content="#1e3a5f" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <style>* { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: sans-serif; background: #f0f4f8; }</style>
@@ -1380,7 +1380,7 @@ function App() {
                             React.createElement("div", { style: { background: "linear-gradient(135deg,#1e3a5f,#2d6a9f)", color: "white", padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "6px 6px 0 0" } },
                                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flex: 1 } },
                                     React.createElement("span", { style: { fontSize: 13 } }, "\uD83D\uDE99"),
-                                    editingCar === ci ? (React.createElement("input", { autoFocus: true, value: carNames[ci], onChange: function (e) { handleCarNameChange(ci, e.target.value); }, onBlur: function () { setEditingCar(null); }, onKeyDown: handleCarNameKeyDown, style: { fontWeight: 800, fontSize: 12, background: "rgba(255,255,255,.2)", border: "none", borderBottom: "2px solid white", color: "white", outline: "none", width: 70, padding: "1px 3px" } })) : (React.createElement("span", { onClick: function () { setEditingCar(ci); }, style: { fontWeight: 800, fontSize: 12, cursor: "pointer", borderBottom: "1.5px dashed rgba(255,255,255,.4)" } }, carName)),
+                                    editingCar === ci ? (React.createElement("input", { autoFocus: true, value: carNames[ci], onChange: function (e) { handleCarNameChange(ci, e.target.value); }, onBlur: function () { setEditingCar(null); }, onKeyDown: handleCarNameKeyDown, style: { fontWeight: 800, fontSize: 12, background: "rgba(255,255,255,.2)", border: "none", borderBottom: "2px solid white", color: "white", outline: "none", width: 80, padding: "1px 3px" } })) : (React.createElement("span", { onClick: function () { setEditingCar(ci); }, style: { fontWeight: 800, fontSize: 12, cursor: "pointer", borderBottom: "1.5px dashed rgba(255,255,255,.4)", minWidth: 60, display: "inline-block", color: carName ? "white" : "rgba(255,255,255,.5)" } }, carName || "名前を入力")),
                                     memoPass.length > 0 && (React.createElement("button", { onClick: function () { toggleMemoCar(ci); }, style: {
                                             background: openMemoCar === ci ? "#fef9c3" : "rgba(255,255,255,.2)",
                                             border: "none", borderRadius: 10, padding: "1px 6px", fontSize: 11, cursor: "pointer",
