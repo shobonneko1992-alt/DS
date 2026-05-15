@@ -11,15 +11,13 @@
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>* { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: sans-serif; background: #f0f4f8; }</style>
 </head>
 <body>
   <div id="root"></div>
   <script>
-// Minimal QR Code generator - pure JS, no dependencies
-// Based on the QR code spec for small data (version 1-10, ECC level M)
-var QRGen = (function() {
+// QRGen removed - text-only transfer
+var QRGen_REMOVED = (function() {
   var GF = {};
   var EXP = new Array(512), LOG = new Array(256);
   (function(){
@@ -309,7 +307,7 @@ var QRGen = (function() {
     return canvas.toDataURL('image/png');
   }
   
-  return { generate: generate, toCanvas: toCanvas, toDataURL: toDataURL };
+  return {};
 })();
 var useState = React.useState, useMemo = React.useMemo, useRef = React.useRef, useEffect = React.useEffect;
 const INIT_CARS = ["1号車", "2号車", "3号車", "4号車"];
@@ -375,26 +373,6 @@ function Badge(props) {
         max && (React.createElement("div", { style: { width: 30, height: 4, background: "#e0e7ef", borderRadius: 2, overflow: "hidden" } },
             React.createElement("div", { style: { height: "100%", width: pct + "%", background: warn ? "#e53e3e" : color, borderRadius: 2 } })))));
 }
-function QRSection(props) {
-    var chunks = props.chunks, qrChunkIdx = props.qrChunkIdx, setQrChunkIdx = props.setQrChunkIdx, drawQR = props.drawQR;
-    var chunk = chunks[qrChunkIdx] || "";
-    React.useEffect(function () {
-        if (chunk)
-            drawQR("qr-canvas-0", chunk);
-    }, [qrChunkIdx, chunk]);
-    return (React.createElement("div", { style: { textAlign: "center" } },
-        chunks.length > 1 && (React.createElement("div", { style: { fontSize: 12, color: "#e65100", fontWeight: 700, marginBottom: 8 } },
-            qrChunkIdx + 1,
-            " / ",
-            chunks.length,
-            " \u679A\u76EE")),
-        React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u76F8\u624B\u306BQR\u30B3\u30FC\u30C9\u3092\u8AAD\u307F\u53D6\u3063\u3066\u3082\u3089\u3063\u3066\u304F\u3060\u3055\u3044"),
-        React.createElement("canvas", { id: "qr-canvas-0", style: { borderRadius: 8, border: "1.5px solid #e0e7ef" } }),
-        chunks.length > 1 && (React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 10 } },
-            React.createElement("button", { onClick: function () { setQrChunkIdx(function (i) { return Math.max(0, i - 1); }); }, disabled: qrChunkIdx === 0, style: { flex: 1, padding: "8px", borderRadius: 8, border: "1.5px solid #e0e7ef", background: qrChunkIdx === 0 ? "#f8fafc" : "white", color: "#718096", fontWeight: 700, cursor: "pointer" } }, "\u2190 \u524D"),
-            React.createElement("button", { onClick: function () { setQrChunkIdx(function (i) { return Math.min(chunks.length - 1, i + 1); }); }, disabled: qrChunkIdx === chunks.length - 1, style: { flex: 1, padding: "8px", borderRadius: 8, border: "1.5px solid #e0e7ef", background: qrChunkIdx === chunks.length - 1 ? "#f8fafc" : "white", color: "#718096", fontWeight: 700, cursor: "pointer" } }, "\u6B21 \u2192"))),
-        React.createElement("div", { style: { fontSize: 10, color: "#a0aec0", marginTop: 8 } }, "\u8AAD\u307F\u53D6\u308A\u5F8C\u3001\u53D7\u3051\u53D6\u308B\u753B\u9762\u3067\u81EA\u52D5\u3067\u53D6\u308A\u8FBC\u307E\u308C\u307E\u3059")));
-}
 function App() {
     var today = new Date();
     var [viewYear, setViewYear] = useState(today.getFullYear());
@@ -426,11 +404,6 @@ function App() {
     var [showDataMenu, setShowDataMenu] = useState(false);
     var [showDataSend, setShowDataSend] = useState(false);
     var [showDataReceive, setShowDataReceive] = useState(false);
-    var [receiveMode, setReceiveMode] = useState("text");
-    var [scanActive, setScanActive] = useState(false);
-    var [scanResult, setScanResult] = useState("");
-    var [sendMode, setSendMode] = useState("text");
-    var [qrChunkIdx, setQrChunkIdx] = useState(0);
     var [receiveText, setReceiveText] = useState("");
     var [receiveError, setReceiveError] = useState("");
     var [toast, setToast] = useState("");
@@ -447,7 +420,6 @@ function App() {
     var [calView, setCalView] = useState("month");
     var [viewDate, setViewDate] = useState(new Date(today.getTime()));
     var [saveStatus, setSaveStatus] = useState("");
-    var [restorePrompt, setRestorePrompt] = useState(null);
     var [showBulk, setShowBulk] = useState(false);
     var [showCopyMenu, setShowCopyMenu] = useState(false);
     var [bulkSource, setBulkSource] = useState(null);
@@ -497,14 +469,6 @@ function App() {
     function onTouchEnd() { lastDist.current = null; startTouches.current = null; }
     useEffect(function () {
         try {
-            var saved = localStorage.getItem("ds_autosave");
-            if (saved)
-                setRestorePrompt(JSON.parse(saved));
-        }
-        catch (e) { }
-    }, []);
-    useEffect(function () {
-        try {
             localStorage.setItem("ds_autosave", JSON.stringify({
                 allGrids: allGrids,
                 people: people,
@@ -517,21 +481,6 @@ function App() {
         }
         catch (e) { }
     }, [allGrids, people, absent, carNames, drivers, driverList]);
-    function restoreData(data) {
-        if (data.allGrids)
-            setAllGrids(data.allGrids);
-        if (data.people)
-            setPeople(data.people);
-        if (data.absent)
-            setAbsent(new Set(data.absent));
-        if (data.carNames)
-            setCarNames(data.carNames);
-        if (data.drivers)
-            setDrivers(data.drivers);
-        if (data.driverList)
-            setDriverList(data.driverList);
-        setRestorePrompt(null);
-    }
     function handleSave() {
         try {
             localStorage.setItem("ds_grids", JSON.stringify(allGrids));
@@ -1125,142 +1074,6 @@ function App() {
             setReceiveError("テキストが正しくありません。もう一度確認してください");
         }
     }
-    function getPeopleQRChunks() {
-        var chunks = [], current = [], currentBytes = 0, MAX_BYTES = 240;
-        for (var i = 0; i < people.length; i++) {
-            var name = people[i].name;
-            var bytes = 0;
-            for (var j = 0; j < name.length; j++) {
-                var c = name.charCodeAt(j);
-                bytes += c < 128 ? 1 : c < 2048 ? 2 : 3;
-            }
-            if (currentBytes + bytes + 1 > MAX_BYTES && current.length > 0) {
-                chunks.push(current);
-                current = [name];
-                currentBytes = bytes;
-            }
-            else {
-                current.push(name);
-                currentBytes += bytes + 1;
-            }
-        }
-        if (current.length > 0)
-            chunks.push(current);
-        return chunks.map(function (ch, i) {
-            return "D:" + ch.join(",");
-        });
-    }
-    function drawQR(canvasId, text) {
-        var canvas = document.getElementById(canvasId);
-        if (!canvas || typeof QRGen === "undefined")
-            return;
-        QRGen.toCanvas(canvas, text, 240);
-    }
-    var scanIntervalRef = useRef(null);
-    var videoRef = useRef(null);
-    var streamRef = useRef(null);
-    function startScan() {
-        setScanActive(true);
-        setScanResult("");
-        setReceiveError("");
-        setTimeout(function () {
-            var video = document.getElementById("qr-video");
-            if (!video) {
-                setScanActive(false);
-                return;
-            }
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } })
-                .then(function (stream) {
-                streamRef.current = stream;
-                video.srcObject = stream;
-                video.play();
-                var canvas = document.createElement("canvas");
-                var ctx = canvas.getContext("2d");
-                scanIntervalRef.current = setInterval(function () {
-                    if (!video.paused && video.readyState >= 2 && video.videoWidth > 0) {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        ctx.drawImage(video, 0, 0);
-                        // jsQR method
-                        if (typeof jsQR !== "undefined") {
-                            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                            var code = jsQR(imageData.data, imageData.width, imageData.height);
-                            if (code) {
-                                stopScan();
-                                handleQRReceive(code.data);
-                            }
-                            // BarcodeDetector method (Android Chrome)
-                        }
-                        else if (typeof BarcodeDetector !== "undefined") {
-                            var detector = new BarcodeDetector({ formats: ["qr_code"] });
-                            detector.detect(video).then(function (codes) {
-                                if (codes.length > 0) {
-                                    stopScan();
-                                    handleQRReceive(codes[0].rawValue);
-                                }
-                            }).catch(function () { });
-                        }
-                        else {
-                            stopScan();
-                            setReceiveError("このブラウザはQRスキャン非対応です。テキストタブをお使いください");
-                        }
-                    }
-                }, 300);
-            })
-                .catch(function (e) {
-                setScanActive(false);
-                setReceiveError("カメラの起動に失敗しました。カメラの許可を確認してください");
-            });
-        }, 150);
-    }
-    function stopScan() {
-        if (scanIntervalRef.current) {
-            clearInterval(scanIntervalRef.current);
-            scanIntervalRef.current = null;
-        }
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(function (t) { t.stop(); });
-            streamRef.current = null;
-        }
-        setScanActive(false);
-    }
-    function handleQRReceive(val) {
-        setScanResult(val);
-        setReceiveText(val);
-        // Auto-import
-        setReceiveError("");
-        setReceiveSuccess(false);
-        try {
-            if (val.startsWith("D:") || val.startsWith("DSC:")) {
-                var names;
-                if (val.startsWith("D:")) {
-                    names = val.slice(2).split(",").filter(function (n) { return n.trim(); });
-                }
-                else {
-                    var parts = val.split(":");
-                    names = parts.slice(2).join(":").split(",").filter(function (n) { return n.trim(); });
-                }
-                if (names.length === 0) {
-                    setReceiveError("データが空です");
-                    return;
-                }
-                setPeople(names.map(function (n) { return { name: n.trim(), memo: "" }; }));
-                setReceiveSuccess(true);
-                return;
-            }
-            var data = JSON.parse(val);
-            if (data.type === "dscar_people_v1" && Array.isArray(data.people)) {
-                setPeople(data.people);
-                setReceiveSuccess(true);
-            }
-            else {
-                setReceiveError("QRコードの形式が正しくありません");
-            }
-        }
-        catch (e) {
-            setReceiveError("QRコードの読み取りに失敗しました");
-        }
-    }
     function movePerson(fromIdx, toIdx) {
         if (fromIdx === toIdx || fromIdx === null || toIdx === null)
             return;
@@ -1419,27 +1232,16 @@ function App() {
         toast && (React.createElement("div", { style: { position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)", background: "#1e3a5f", color: "white", padding: "10px 24px", borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 99999, boxShadow: "0 4px 12px rgba(0,0,0,.3)" } },
             "\u2713 ",
             toast)),
-        restorePrompt && (React.createElement("div", { style: modalOverlay },
-            React.createElement("div", { style: { background: "white", borderRadius: 16, padding: 24, maxWidth: 320, width: "100%" } },
-                React.createElement("div", { style: { fontSize: 28, textAlign: "center", marginBottom: 8 } }, "\uD83D\uDCBE"),
-                React.createElement("div", { style: { fontWeight: 800, fontSize: 16, color: "#1e3a5f", textAlign: "center", marginBottom: 6 } }, "\u524D\u56DE\u306E\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u3059"),
-                React.createElement("div", { style: { fontSize: 12, color: "#718096", textAlign: "center", marginBottom: 20 } },
-                    "\u4FDD\u5B58\u65E5\u6642\uFF1A",
-                    restorePrompt.savedAt),
-                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
-                    React.createElement("button", { onClick: function () { restoreData(restorePrompt); }, style: { background: "#1e3a5f", color: "white", border: "none", borderRadius: 10, padding: "12px", fontWeight: 700, fontSize: 14, cursor: "pointer" } }, "\u2713 \u524D\u56DE\u306E\u5185\u5BB9\u3092\u5FA9\u5143\u3059\u308B"),
-                    React.createElement("button", { onClick: function () { setRestorePrompt(null); }, style: { background: "#f0f4f8", color: "#718096", border: "none", borderRadius: 10, padding: "12px", fontWeight: 700, fontSize: 14, cursor: "pointer" } }, "\u00D7 \u65B0\u3057\u304F\u59CB\u3081\u308B"))))),
         React.createElement("div", { style: { background: "linear-gradient(135deg,#1e3a5f,#2d6a9f)", color: "white", padding: "8px 10px", boxShadow: "0 4px 16px rgba(30,58,95,.4)" } },
             React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 } },
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-                    React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDE90"),
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", marginRight: 20, paddingLeft: 10 } },
                     React.createElement("span", { style: { fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" } }, "\u30C7\u30A4\u30B5\u30FC\u30D3\u30B9 \u9001\u8FCE\u8868"),
                     React.createElement("button", { onClick: handleSave, style: {
-                            padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11,
+                            padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, marginLeft: 25, whiteSpace: "nowrap",
                             background: saveStatus === "ok" ? "#e8f5e9" : saveStatus === "err" ? "#fee2e2" : "rgba(255,255,255,.2)",
                             color: saveStatus === "ok" ? "#2e7d32" : saveStatus === "err" ? "#e53e3e" : "white",
                         } }, saveStatus === "ok" ? "✓ 保存済" : saveStatus === "err" ? "✗ エラー" : "💾 保存")),
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3, background: "rgba(255,255,255,.1)", borderRadius: 20, padding: "3px 8px" } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3, background: "rgba(255,255,255,.1)", borderRadius: 20, padding: "3px 8px", marginRight: 10 } },
                     React.createElement("button", { onClick: handleZoomDown, style: { background: "none", border: "none", color: "white", fontSize: 16, cursor: "pointer", padding: "0 2px", fontWeight: 700 } }, "\u2212"),
                     React.createElement("span", { style: { fontSize: 10, color: "rgba(255,255,255,.8)", minWidth: 30, textAlign: "center" } },
                         Math.round(zoom * 100),
@@ -1837,25 +1639,17 @@ function App() {
                     React.createElement("div", { style: { fontWeight: 800, fontSize: 16, color: "#1e3a5f", marginBottom: 6, textAlign: "center" } }, "\uD83D\uDCE4 \u5229\u7528\u8005\u30C7\u30FC\u30BF"),
                     React.createElement("div", { style: { fontSize: 12, color: "#718096", textAlign: "center", marginBottom: 20 } }, "\u5229\u7528\u8005\u4E00\u89A7\u3092\u4ED6\u306E\u7AEF\u672B\u3068\u5171\u6709\u3067\u304D\u307E\u3059"),
                     React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 } },
-                        React.createElement("button", { onClick: function () { setShowDataMenu(false); setShowDataSend(true); setSendMode("text"); }, style: { padding: "14px", borderRadius: 12, border: "2px solid #2d6a9f", background: "#e3f2fd", color: "#2d6a9f", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "left" } },
+                        React.createElement("button", { onClick: function () { setShowDataMenu(false); setShowDataSend(true); }, style: { padding: "14px", borderRadius: 12, border: "2px solid #2d6a9f", background: "#e3f2fd", color: "#2d6a9f", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "left" } },
                             "\uD83D\uDCE8 \u9001\u308B",
-                            React.createElement("div", { style: { fontSize: 11, fontWeight: 400, color: "#2d6a9f", marginTop: 2 } }, "\u30C6\u30AD\u30B9\u30C8\u307E\u305F\u306FQR\u30B3\u30FC\u30C9\u3067\u5171\u6709")),
-                        React.createElement("button", { onClick: function () { setShowDataMenu(false); setShowDataReceive(true); setReceiveText(""); setReceiveError(""); setReceiveSuccess(false); setReceiveMode("text"); setScanResult(""); setScanActive(false); }, style: { padding: "14px", borderRadius: 12, border: "2px solid #059669", background: "#ecfdf5", color: "#059669", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "left" } },
+                            React.createElement("div", { style: { fontSize: 11, fontWeight: 400, color: "#2d6a9f", marginTop: 2 } }, "\u30C6\u30AD\u30B9\u30C8\u3067\u5171\u6709")),
+                        React.createElement("button", { onClick: function () { setShowDataMenu(false); setShowDataReceive(true); setReceiveText(""); setReceiveError(""); setReceiveSuccess(false); }, style: { padding: "14px", borderRadius: 12, border: "2px solid #059669", background: "#ecfdf5", color: "#059669", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "left" } },
                             "\uD83D\uDCE5 \u53D7\u3051\u53D6\u308B",
                             React.createElement("div", { style: { fontSize: 11, fontWeight: 400, color: "#059669", marginTop: 2 } }, "\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u30A4\u30F3\u30DD\u30FC\u30C8"))),
                     React.createElement("button", { onClick: function () { setShowDataMenu(false); }, style: { width: "100%", padding: "10px", borderRadius: 10, border: "1.5px solid #e0e7ef", background: "white", color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u30AD\u30E3\u30F3\u30BB\u30EB")))),
             showDataSend && (React.createElement("div", { style: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 } },
                 React.createElement("div", { style: { background: "white", borderRadius: 16, padding: 20, width: "100%", maxWidth: 360, maxHeight: "90vh", overflowY: "auto" } },
                     React.createElement("div", { style: { fontWeight: 800, fontSize: 16, color: "#1e3a5f", marginBottom: 12, textAlign: "center" } }, "\uD83D\uDCE8 \u5229\u7528\u8005\u30C7\u30FC\u30BF\u3092\u9001\u308B"),
-                    React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 14 } }, [["text", "📝 テキスト"], ["qr", "📷 QRコード"]].map(function (item) {
-                        var v = item[0], lbl = item[1];
-                        return (React.createElement("button", { key: v, onClick: function () { setSendMode(v); setQrChunkIdx(0); setTimeout(function () { if (v === "qr")
-                                drawQR("qr-canvas-0", getPeopleQRChunks()[0]); }, 50); }, style: { flex: 1, padding: "8px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                                border: "1.5px solid " + (sendMode === v ? "#2d6a9f" : "#e0e7ef"),
-                                background: sendMode === v ? "#e3f2fd" : "white",
-                                color: sendMode === v ? "#2d6a9f" : "#718096" } }, lbl));
-                    })),
-                    sendMode === "text" && (React.createElement("div", null,
+                    React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u4EE5\u4E0B\u306E\u30C6\u30AD\u30B9\u30C8\u3092\u30B3\u30D4\u30FC\u3057\u3066LINE\u3084\u30E1\u30FC\u30EB\u3067\u9001\u3063\u3066\u304F\u3060\u3055\u3044"),
                         React.createElement("textarea", { readOnly: true, value: getPeopleDataText(), style: { width: "100%", height: 120, border: "1.5px solid #e0e7ef", borderRadius: 8, padding: "8px", fontSize: 10, fontFamily: "monospace", resize: "none", outline: "none" }, onClick: function (e) { e.target.select(); } }),
                         React.createElement("button", { onClick: function () {
@@ -1873,8 +1667,7 @@ function App() {
                                 }
                                 setToast("コピーしました！");
                                 setTimeout(function () { setToast(""); }, 2000);
-                            }, style: { marginTop: 8, width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "#2d6a9f", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDCCB \u30B3\u30D4\u30FC\u3059\u308B"))),
-                    sendMode === "qr" && React.createElement(QRSection, { chunks: getPeopleQRChunks(), qrChunkIdx: qrChunkIdx, setQrChunkIdx: setQrChunkIdx, drawQR: drawQR }),
+                            }, style: { marginTop: 8, width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "#2d6a9f", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDCCB \u30B3\u30D4\u30FC\u3059\u308B")),
                     React.createElement("button", { onClick: function () { setShowDataSend(false); }, style: { marginTop: 12, width: "100%", padding: "10px", borderRadius: 10, border: "1.5px solid #e0e7ef", background: "white", color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u9589\u3058\u308B")))),
             showDataReceive && (React.createElement("div", { style: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 } },
                 React.createElement("div", { style: { background: "white", borderRadius: 16, padding: 20, width: "100%", maxWidth: 360, maxHeight: "90vh", overflowY: "auto" } },
@@ -1885,39 +1678,15 @@ function App() {
                         React.createElement("div", { style: { fontSize: 12, color: "#718096" } },
                             people.length,
                             "\u540D\u306E\u5229\u7528\u8005\u30C7\u30FC\u30BF\u3092\u53D6\u308A\u8FBC\u307F\u307E\u3057\u305F"),
-                        React.createElement("button", { onClick: function () { stopScan(); setShowDataReceive(false); setReceiveSuccess(false); }, style: { marginTop: 16, width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "#059669", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u9589\u3058\u308B"))) : (React.createElement("div", null,
-                        React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 14 } }, [["text", "📝 テキスト"], ["qr", "📷 QRスキャン"]].map(function (item) {
-                            var v = item[0], lbl = item[1];
-                            return (React.createElement("button", { key: v, onClick: function () { if (receiveMode !== v) {
-                                    stopScan();
-                                    setReceiveMode(v);
-                                    setScanResult("");
-                                    setReceiveError("");
-                                } }, style: { flex: 1, padding: "8px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                                    border: "1.5px solid " + (receiveMode === v ? "#059669" : "#e0e7ef"),
-                                    background: receiveMode === v ? "#ecfdf5" : "white",
-                                    color: receiveMode === v ? "#059669" : "#718096" } }, lbl));
-                        })),
-                        receiveMode === "text" && (React.createElement("div", null,
-                            React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u9001\u308A\u624B\u304B\u3089\u3082\u3089\u3063\u305F\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u304F\u3060\u3055\u3044"),
-                            React.createElement("textarea", { value: receiveText, onChange: function (e) { setReceiveText(e.target.value); setReceiveError(""); }, placeholder: "\u3053\u3053\u306B\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u2026", style: { width: "100%", height: 120, border: "1.5px solid " + (receiveError ? "#fca5a5" : "#e0e7ef"), borderRadius: 8, padding: "8px", fontSize: 10, fontFamily: "monospace", resize: "none", outline: "none" } }),
-                            receiveError && React.createElement("div", { style: { fontSize: 12, color: "#e53e3e", marginTop: 6 } },
-                                "\u26A0\uFE0F ",
-                                receiveError),
-                            React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 12 } },
-                                React.createElement("button", { onClick: function () { setShowDataReceive(false); setReceiveText(""); setReceiveError(""); }, style: { flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #e0e7ef", background: "white", color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u30AD\u30E3\u30F3\u30BB\u30EB"),
-                                React.createElement("button", { onClick: handleReceiveData, disabled: !receiveText.trim(), style: { flex: 2, padding: "10px", borderRadius: 10, border: "none", background: receiveText.trim() ? "#059669" : "#c0ccda", color: "white", fontSize: 13, fontWeight: 700, cursor: receiveText.trim() ? "pointer" : "default" } }, "\u2713 \u30A4\u30F3\u30DD\u30FC\u30C8")))),
-                        receiveMode === "qr" && (React.createElement("div", { style: { textAlign: "center" } },
-                            !scanActive ? (React.createElement("div", null,
-                                React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 12 } }, "\u30AB\u30E1\u30E9\u3067QR\u30B3\u30FC\u30C9\u3092\u8AAD\u307F\u53D6\u308A\u307E\u3059"),
-                                receiveError && (React.createElement("div", { style: { fontSize: 12, color: "#e53e3e", marginBottom: 10 } },
-                                    "\u26A0\uFE0F ",
-                                    receiveError)),
-                                React.createElement("button", { onClick: startScan, style: { width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "#059669", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\uD83D\uDCF7 \u30B9\u30AD\u30E3\u30F3\u958B\u59CB"))) : (React.createElement("div", null,
-                                React.createElement("div", { style: { fontSize: 12, color: "#059669", fontWeight: 700, marginBottom: 8 } }, "QR\u30B3\u30FC\u30C9\u3092\u30AB\u30E1\u30E9\u306B\u5411\u3051\u3066\u304F\u3060\u3055\u3044"),
-                                React.createElement("video", { id: "qr-video", playsInline: true, muted: true, style: { width: "100%", maxWidth: 280, borderRadius: 10, border: "2px solid #059669" } }),
-                                React.createElement("button", { onClick: stopScan, style: { marginTop: 10, width: "100%", padding: "10px", borderRadius: 10, border: "1.5px solid #e0e7ef", background: "white", color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u25A0 \u30AD\u30E3\u30F3\u30BB\u30EB"))),
-                            !scanActive && (React.createElement("button", { onClick: function () { stopScan(); setShowDataReceive(false); setReceiveSuccess(false); setReceiveText(""); setReceiveError(""); setScanResult(""); }, style: { marginTop: 10, width: "100%", padding: "10px", borderRadius: 10, border: "1.5px solid #e0e7ef", background: "white", color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u9589\u3058\u308B"))))))))))) : (React.createElement("div", null,
+                        React.createElement("button", { onClick: function () { setShowDataReceive(false); setReceiveSuccess(false); }, style: { marginTop: 16, width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "#059669", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u9589\u3058\u308B"))) : (React.createElement("div", null,
+                        React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u9001\u308A\u624B\u304B\u3089\u3082\u3089\u3063\u305F\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u304F\u3060\u3055\u3044"),
+                        React.createElement("textarea", { value: receiveText, onChange: function (e) { setReceiveText(e.target.value); setReceiveError(""); }, placeholder: "\u3053\u3053\u306B\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u2026", style: { width: "100%", height: 120, border: "1.5px solid " + (receiveError ? "#fca5a5" : "#e0e7ef"), borderRadius: 8, padding: "8px", fontSize: 10, fontFamily: "monospace", resize: "none", outline: "none" } }),
+                        receiveError && React.createElement("div", { style: { fontSize: 12, color: "#e53e3e", marginTop: 6 } },
+                            "\u26A0\uFE0F ",
+                            receiveError),
+                        React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 12 } },
+                            React.createElement("button", { onClick: function () { setShowDataReceive(false); setReceiveText(""); setReceiveError(""); }, style: { flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #e0e7ef", background: "white", color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u30AD\u30E3\u30F3\u30BB\u30EB"),
+                            React.createElement("button", { onClick: handleReceiveData, disabled: !receiveText.trim(), style: { flex: 2, padding: "10px", borderRadius: 10, border: "none", background: receiveText.trim() ? "#059669" : "#c0ccda", color: "white", fontSize: 13, fontWeight: 700, cursor: receiveText.trim() ? "pointer" : "default" } }, "\u2713 \u30A4\u30F3\u30DD\u30FC\u30C8"))))))))) : (React.createElement("div", null,
             React.createElement("div", { style: { background: "#162d4a", padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" } },
                 React.createElement("button", { onClick: function () { setSelectedDate(null); }, style: { background: "rgba(255,255,255,.15)", border: "none", color: "white", borderRadius: 8, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontWeight: 700 } }, "\u2190 \u30AB\u30EC\u30F3\u30C0\u30FC"),
                 React.createElement("span", { style: { fontWeight: 800, fontSize: 14, color: "white" } }, selLabel),
