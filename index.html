@@ -16,299 +16,7 @@
 <body>
   <div id="root"></div>
   <script>
-// QRGen removed - text-only transfer
-var QRGen_REMOVED = (function() {
-  var GF = {};
-  var EXP = new Array(512), LOG = new Array(256);
-  (function(){
-    var x = 1;
-    for(var i=0;i<255;i++){
-      EXP[i]=x; LOG[x]=i;
-      x<<=1; if(x>=256) x^=285;
-    }
-    for(var i=255;i<512;i++) EXP[i]=EXP[i-255];
-  })();
-  function gmul(a,b){ return a&&b ? EXP[LOG[a]+LOG[b]] : 0; }
-  function gpow(a,b){ return EXP[(LOG[a]*b)%255]; }
-  
-  function rsEncode(data, nec) {
-    var gen = [1];
-    for(var i=0;i<nec;i++){
-      var newgen = new Array(gen.length+1).fill(0);
-      for(var j=0;j<gen.length;j++){
-        newgen[j]^=gen[j];
-        newgen[j+1]^=gmul(gen[j],gpow(2,i));
-      }
-      gen=newgen;
-    }
-    var msg = data.slice().concat(new Array(nec).fill(0));
-    for(var i=0;i<data.length;i++){
-      var c=msg[i];
-      if(c) for(var j=0;j<gen.length;j++) msg[i+j]^=gmul(gen[j],c);
-    }
-    return msg.slice(data.length);
-  }
-
-  // Version/ECC table [version][ecc_level]: [total_codewords, data_codewords, ec_codewords, blocks]
-  var CAPS = {
-    1:  {M:{total:26,  data:16,  ec:10,  blocks:1}},
-    2:  {M:{total:44,  data:28,  ec:16,  blocks:1}},
-    3:  {M:{total:70,  data:44,  ec:26,  blocks:2}},
-    4:  {M:{total:100, data:64,  ec:36,  blocks:2}},
-    5:  {M:{total:134, data:86,  ec:48,  blocks:2}},
-    6:  {M:{total:172, data:108, ec:64,  blocks:4}},
-    7:  {M:{total:196, data:124, ec:72,  blocks:4}},
-    8:  {M:{total:242, data:154, ec:88,  blocks:4}},
-    9:  {M:{total:292, data:182, ec:110, blocks:5}},
-    10: {M:{total:346, data:216, ec:130, blocks:6}},
-    11: {M:{total:404, data:254, ec:150, blocks:6}},
-    12: {M:{total:466, data:290, ec:176, blocks:8}},
-    13: {M:{total:532, data:334, ec:198, blocks:8}},
-    14: {M:{total:581, data:365, ec:216, blocks:10}},
-    15: {M:{total:655, data:415, ec:240, blocks:10}},
-  };
-  
-  function getVersion(dataLen) {
-    // byte mode: need data_codewords - 2 (mode indicator 4bits + length 8bits = 1.5 bytes, round up to 2)
-    for(var v=1;v<=15;v++){
-      if(!CAPS[v]) continue;
-      if(CAPS[v].M.data - 2 >= dataLen) return v;
-    }
-    return -1;
-  }
-
-  function encode(text) {
-    var bytes = [];
-    for(var i=0;i<text.length;i++){
-      var c = text.charCodeAt(i);
-      if(c>127){
-        var enc = unescape(encodeURIComponent(text[i]));
-        for(var j=0;j<enc.length;j++) bytes.push(enc.charCodeAt(j));
-      } else {
-        bytes.push(c);
-      }
-    }
-    var version = getVersion(bytes.length);
-    if(version<0) return null;
-    var cap = CAPS[version].M;
-    
-    // Build data bits
-    var bits = [];
-    function addBits(val, len) {
-      for(var i=len-1;i>=0;i--) bits.push((val>>i)&1);
-    }
-    addBits(4, 4); // byte mode
-    addBits(bytes.length, 8);
-    for(var i=0;i<bytes.length;i++) addBits(bytes[i],8);
-    addBits(0,4); // terminator
-    while(bits.length%8) bits.push(0);
-    var data = [];
-    for(var i=0;i<bits.length;i+=8){
-      var b=0; for(var j=0;j<8;j++) b=(b<<1)|bits[i+j];
-      data.push(b);
-    }
-    var pad=[236,17]; var pi=0;
-    while(data.length<cap.data) data.push(pad[pi++%2]);
-    
-    // RS encode - handle uneven blocks
-    var ecPerBlock = Math.floor(cap.ec/cap.blocks);
-    var shortBlockSize = Math.floor(cap.data/cap.blocks);
-    var longBlocks = cap.data % cap.blocks;
-    var shortBlocks = cap.blocks - longBlocks;
-    var blocks = [], ecblocks = [];
-    var pos = 0;
-    for(var i=0;i<cap.blocks;i++){
-      var bsize = (i < shortBlocks) ? shortBlockSize : shortBlockSize + 1;
-      var block = data.slice(pos, pos + bsize);
-      pos += bsize;
-      blocks.push(block);
-      ecblocks.push(rsEncode(block, ecPerBlock));
-    }
-    
-    // Interleave
-    var codewords = [];
-    var maxLen = Math.max.apply(null, blocks.map(function(b){return b.length;}));
-    for(var i=0;i<maxLen;i++) for(var j=0;j<blocks.length;j++) if(i<blocks[j].length) codewords.push(blocks[j][i]);
-    var maxEc = Math.max.apply(null, ecblocks.map(function(b){return b.length;}));
-    for(var i=0;i<maxEc;i++) for(var j=0;j<ecblocks.length;j++) if(i<ecblocks[j].length) codewords.push(ecblocks[j][i]);
-    
-    return {version:version, codewords:codewords};
-  }
-
-  // Alignment pattern positions by version
-  var ALIGN = {1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38],8:[6,24,42],9:[6,26,46],10:[6,28,50],11:[6,30,54],12:[6,32,58],13:[6,34,62],14:[6,26,46,66],15:[6,26,48,70]};
-  
-  function makeMatrix(version) {
-    var size = version*4+17;
-    var mat = [];
-    for(var i=0;i<size;i++){ mat.push([]); for(var j=0;j<size;j++) mat[i].push(null); }
-    
-    function setFinder(r,c) {
-      for(var dr=-1;dr<=7;dr++) for(var dc=-1;dc<=7;dc++){
-        var rr=r+dr,cc=c+dc;
-        if(rr<0||rr>=size||cc<0||cc>=size) continue;
-        var inBox=(dr>=0&&dr<=6&&dc>=0&&dc<=6);
-        var onBorder=(dr===0||dr===6||dc===0||dc===6);
-        var inInner=(dr>=2&&dr<=4&&dc>=2&&dc<=4);
-        mat[rr][cc] = inBox && (onBorder||inInner) ? 1 : 0;
-      }
-    }
-    setFinder(0,0); setFinder(0,size-7); setFinder(size-7,0);
-    
-    // Timing
-    for(var i=8;i<size-8;i++) mat[6][i]=mat[i][6]=(i%2===0)?1:0;
-    
-    // Dark module
-    mat[size-8][8]=1;
-    
-    // Alignment
-    var al=ALIGN[version];
-    for(var ai=0;ai<al.length;ai++) for(var bi=0;bi<al.length;bi++){
-      var r=al[ai],c=al[bi];
-      if(mat[r][c]!==null) continue;
-      for(var dr=-2;dr<=2;dr++) for(var dc=-2;dc<=2;dc++){
-        mat[r+dr][c+dc]=(Math.abs(dr)===2||Math.abs(dc)===2||dr===0&&dc===0)?1:0;
-      }
-    }
-    return mat;
-  }
-  
-  function placeData(mat, codewords, version) {
-    var size = mat.length;
-    var bits = [];
-    for(var i=0;i<codewords.length;i++) for(var j=7;j>=0;j--) bits.push((codewords[i]>>j)&1);
-    
-    var bi=0, up=true;
-    for(var col=size-1;col>=0;col-=2){
-      if(col===6) col--;
-      for(var ri=0;ri<size;ri++){
-        var row = up ? size-1-ri : ri;
-        for(var dx=0;dx<=1;dx++){
-          var c=col-dx;
-          if(mat[row][c]===null){
-            mat[row][c] = bi<bits.length ? bits[bi++] : 0;
-          }
-        }
-      }
-      up=!up;
-    }
-  }
-  
-  function applyMask(mat, mask) {
-    var size=mat.length;
-    var masks=[
-      function(r,c){return (r+c)%2===0;},
-      function(r,c){return r%2===0;},
-      function(r,c){return c%3===0;},
-      function(r,c){return (r+c)%3===0;},
-      function(r,c){return (Math.floor(r/2)+Math.floor(c/3))%2===0;},
-      function(r,c){return (r*c)%2+(r*c)%3===0;},
-      function(r,c){return ((r*c)%2+(r*c)%3)%2===0;},
-      function(r,c){return ((r+c)%2+(r*c)%3)%2===0;},
-    ];
-    var res=mat.map(function(row){return row.slice();});
-    for(var r=0;r<size;r++) for(var c=0;c<size;c++){
-      if(mat[r][c]===0||mat[r][c]===1) continue; // function module
-      if(masks[mask](r,c)) res[r][c]^=1;
-    }
-    return res;
-  }
-  
-  function setFormatInfo(mat, mask) {
-    var fmt_table={0:0x5412,1:0x5125,2:0x5E7C,3:0x5B4B,4:0x45F9,5:0x40CE,6:0x4F97,7:0x4AA0};
-    var fmt=fmt_table[mask];
-    var size=mat.length;
-    var bits=[];
-    for(var i=14;i>=0;i--) bits.push((fmt>>i)&1);
-    var pos=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
-    for(var i=0;i<15;i++){
-      mat[pos[i][0]][pos[i][1]]=bits[i];
-      var r2=i<7?size-1-i:8, c2=i<7?8:size-15+i;
-      mat[r2][c2]=bits[i];
-    }
-    // Version info for v7+
-    var version = (size-17)/4;
-    if(version>=7){
-      var vinfo_table={
-        7:0x07C94,8:0x085BC,9:0x09A99,10:0x0A4D3,11:0x0ABCD,
-        12:0x0B08F,13:0x0BF14,14:0x0C1BC,15:0x0C9A7
-      };
-      var vbits=[];
-      var vinfo=vinfo_table[version]||0;
-      for(var i=17;i>=0;i--) vbits.push((vinfo>>i)&1);
-      var bi=0;
-      for(var c=0;c<6;c++) for(var r=size-11;r<size-8;r++){
-        mat[r][c]=vbits[bi]; mat[c][r]=vbits[bi]; bi++;
-      }
-    }
-  }
-  
-  function penalty(mat) {
-    var size=mat.length, score=0;
-    // Rule 1: 5+ in a row
-    for(var r=0;r<size;r++){
-      var run=1;
-      for(var c=1;c<size;c++){
-        if(mat[r][c]===mat[r][c-1]) run++;
-        else{ if(run>=5) score+=run-2; run=1; }
-      }
-      if(run>=5) score+=run-2;
-    }
-    for(var c=0;c<size;c++){
-      var run=1;
-      for(var r=1;r<size;r++){
-        if(mat[r][c]===mat[r-1][c]) run++;
-        else{ if(run>=5) score+=run-2; run=1; }
-      }
-      if(run>=5) score+=run-2;
-    }
-    // Rule 2: 2x2 blocks
-    for(var r=0;r<size-1;r++) for(var c=0;c<size-1;c++){
-      var v=mat[r][c];
-      if(v===mat[r][c+1]&&v===mat[r+1][c]&&v===mat[r+1][c+1]) score+=3;
-    }
-    return score;
-  }
-  
-  function generate(text) {
-    var enc = encode(text);
-    if(!enc) return null;
-    var base = makeMatrix(enc.version);
-    placeData(base, enc.codewords, enc.version);
-    
-    var best=null, bestScore=Infinity;
-    for(var m=0;m<8;m++){
-      var mat2=applyMask(base,m);
-      setFormatInfo(mat2,m);
-      var s=penalty(mat2);
-      if(s<bestScore){ bestScore=s; best=mat2; }
-    }
-    return best;
-  }
-  
-  function toCanvas(canvas, text, size) {
-    var mat = generate(text);
-    if(!mat) { console.error('Data too long for QR code'); return; }
-    var qsize = mat.length;
-    var cell = Math.floor(size/qsize);
-    var offset = Math.floor((size - cell*qsize)/2);
-    canvas.width = canvas.height = size;
-    var ctx = canvas.getContext('2d');
-    ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size);
-    ctx.fillStyle='#000';
-    for(var r=0;r<qsize;r++) for(var c=0;c<qsize;c++){
-      if(mat[r][c]) ctx.fillRect(offset+c*cell, offset+r*cell, cell, cell);
-    }
-  }
-  
-  function toDataURL(text, size) {
-    var canvas = document.createElement('canvas');
-    toCanvas(canvas, text, size || 240);
-    return canvas.toDataURL('image/png');
-  }
-  
-  return {};
-})();
+// --- QRGen removed (text-only transfer) ---
 var useState = React.useState, useMemo = React.useMemo, useRef = React.useRef, useEffect = React.useEffect;
 const INIT_CARS = ["1号車", "2号車", "3号車", "4号車"];
 const SEATS = 5;
@@ -318,21 +26,31 @@ const INIT_PEOPLE = [
     "田中 花子", "山田 一郎", "佐藤 幸子", "鈴木 健二", "高橋 美代", "伊藤 正雄",
     "渡辺 節子", "中村 博", "小林 和子", "加藤 清", "吉田 光子", "山口 茂",
     "松本 富子", "井上 勝", "木村 千代", "林 英雄", "清水 絹子", "山崎 隆",
-].map(function (name) { return { name: name, memo: "" }; });
-const TIME_OPTIONS = [];
-for (var _h = 6; _h <= 20; _h++) {
-    for (var _m = 0; _m < 60; _m += 5) {
-        TIME_OPTIONS.push(String(_h).padStart(2, "0") + ":" + String(_m).padStart(2, "0"));
+].map(function (name) { return { name: name, memo: "", days: [], periods: [] }; });
+const DAY_LABELS = ["月","火","水","木","金"];
+const PERIOD_LABELS = ["AM","PM"];
+const TIME_OPTIONS_AM = [];
+for (let _h = 7; _h <= 13; _h++) {
+    for (let _m = 0; _m < 60; _m += 5) {
+        if (_h === 13 && _m > 0) break;
+        TIME_OPTIONS_AM.push(String(_h).padStart(2, "0") + ":" + String(_m).padStart(2, "0"));
+    }
+}
+const TIME_OPTIONS_PM = [];
+for (let _h = 12; _h <= 18; _h++) {
+    for (let _m = 0; _m < 60; _m += 5) {
+        if (_h === 18 && _m > 0) break;
+        TIME_OPTIONS_PM.push(String(_h).padStart(2, "0") + ":" + String(_m).padStart(2, "0"));
     }
 }
 function mkGrid() {
     return INIT_CARS.map(function () {
         return Array(SEATS).fill(null).map(function () {
-            return { name: "", seatNo: "", time: "" };
+            return { name: "", seatNo: "", time: "", color: "" };
         });
     });
 }
-function mkDay() { return { AM: mkGrid(), PM: mkGrid() }; }
+function mkDay() { return { AM: mkGrid(), PM: mkGrid(), drivers: ["", "", "", ""] }; }
 function toKey(y, m, d) {
     return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
 }
@@ -346,6 +64,7 @@ function cloneGrid(g) {
     return {
         AM: g.AM.map(function (c) { return c.map(function (s) { return Object.assign({}, s); }); }),
         PM: g.PM.map(function (c) { return c.map(function (s) { return Object.assign({}, s); }); }),
+        drivers: g.drivers ? g.drivers.slice() : ["", "", "", ""],
     };
 }
 function clearNameInGrid(g, name) {
@@ -356,6 +75,7 @@ function clearNameInGrid(g, name) {
                     seat.name = "";
                     seat.seatNo = "";
                     seat.time = "";
+                    seat.color = "";
                 }
             });
         });
@@ -373,25 +93,428 @@ function Badge(props) {
         max && (React.createElement("div", { style: { width: 30, height: 4, background: "#e0e7ef", borderRadius: 2, overflow: "hidden" } },
             React.createElement("div", { style: { height: "100%", width: pct + "%", background: warn ? "#e53e3e" : color, borderRadius: 2 } })))));
 }
+function getMondayKey(date) {
+    var d = new Date(date);
+    var dow = d.getDay();
+    d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+    return toKey(d.getFullYear(), d.getMonth(), d.getDate());
+}
+var DAY_JP = ["日","月","火","水","木","金","土"];
+var WEEK_SECTIONS = [
+    { label: "AM 迎え", period: "AM", dir: "迎え" },
+    { label: "PM 迎え", period: "PM", dir: "迎え" },
+];
+var COLOR_BG_MAP = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
+
+function WeekTable(props) {
+    var allGrids = props.allGrids, setAllGrids = props.setAllGrids, selectedDate = props.selectedDate, carNames = props.carNames, drivers = props.drivers, driverList = props.driverList, absent = props.absent;
+    var [section, setSection] = useState(0);
+    var sec = WEEK_SECTIONS[section];
+
+    // ── 色編集 ──────────────────────────────────────────────────────────
+    var [weekColorMode, setWeekColorMode] = useState(false);
+    var [weekPaintColor, setWeekPaintColor] = useState("");
+
+    function setSeatWeekColor(dateKey, period, ci, si, colorVal) {
+        if (!setAllGrids) return;
+        setAllGrids(function(prev) {
+            var next = JSON.parse(JSON.stringify(prev));
+            if (!next[dateKey]) return prev;
+            if (!next[dateKey][period] || !next[dateKey][period][ci] || !next[dateKey][period][ci][si]) return prev;
+            next[dateKey][period][ci][si].color = colorVal;
+            return next;
+        });
+    }
+
+    // ── ズームコントロール ────────────────────────────────────────────
+    var [zoom, setZoom] = useState(1);
+    var pinchRef = useRef(null);
+    var lastDist = useRef(null);
+    var startTouches = useRef(null);
+    function getPinchDist(t) {
+        var dx = t[0].clientX - t[1].clientX;
+        var dy = t[0].clientY - t[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    function onPinchStart(e) {
+        if (e.touches.length === 2) {
+            lastDist.current = getPinchDist(e.touches);
+            startTouches.current = [
+                { x: e.touches[0].clientX, y: e.touches[0].clientY },
+                { x: e.touches[1].clientX, y: e.touches[1].clientY },
+            ];
+        }
+    }
+    function onPinchMove(e) {
+        if (e.touches.length === 2 && lastDist.current && startTouches.current) {
+            var dx0 = Math.abs(e.touches[0].clientX - startTouches.current[0].x);
+            var dy0 = Math.abs(e.touches[0].clientY - startTouches.current[0].y);
+            var dx1 = Math.abs(e.touches[1].clientX - startTouches.current[1].x);
+            var dy1 = Math.abs(e.touches[1].clientY - startTouches.current[1].y);
+            if (dx0 + dx1 <= dy0 + dy1) return; // 縦スクロールは無視
+            var dist = getPinchDist(e.touches);
+            setZoom(function(z) {
+                return Math.min(2, Math.max(0.4, parseFloat((z + (dist - lastDist.current) * 0.003).toFixed(3))));
+            });
+            lastDist.current = dist;
+        }
+    }
+    function onPinchEnd() { lastDist.current = null; startTouches.current = null; }
+    var [showPrintMenu, setShowPrintMenu] = useState(false);
+
+    // Get Mon-Fri of the selected date's week
+    var weekDates = React.useMemo(function() {
+        if (!selectedDate) return [];
+        var mon = new Date(getMondayKey(new Date(selectedDate + "T00:00:00")) + "T00:00:00");
+        var days = [];
+        for (var i = 0; i < 7; i++) {
+            if (days.length >= 5) break;
+            var d = new Date(mon.getTime());
+            d.setDate(d.getDate() + i);
+            if (d.getDay() !== 0 && d.getDay() !== 6) {
+                var key = toKey(d.getFullYear(), d.getMonth(), d.getDate());
+                days.push({ key: key, label: (d.getMonth()+1) + "/" + d.getDate() + "（" + DAY_JP[d.getDay()] + "）" });
+            }
+        }
+        return days;
+    }, [selectedDate]);
+
+    if (!selectedDate || weekDates.length === 0) {
+        return React.createElement("div", { style: { padding: 20, color: "#a0aec0", textAlign: "center" } }, "日付を選択してください");
+    }
+
+    var SEAT_COUNT = 5;
+
+    // ── 苗字安全抽出ユーティリティ ─────────────────────────────────────
+    // null/undefined/空文字はガードして空文字を返す。
+    // 前後の余分なスペースをtrimしたうえで、
+    // 半角・全角・連続スペースを区切りとして分割し、先頭要素（苗字）を返す。
+    // スペースが一切ない場合は元の文字列をそのまま返す。
+    function getSurname(rawName) {
+        if (rawName == null || rawName === "") return "";
+        var trimmed = rawName.trim();
+        if (!trimmed) return "";
+        var parts = trimmed.split(/[\s\u3000]+/);
+        return (parts[0] && parts[0].length > 0) ? parts[0] : trimmed;
+    }
+
+    function buildWeekPrintHtml(sections) {
+        var colorBgMap = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
+        var mon = new Date(getMondayKey(new Date(selectedDate + "T00:00:00")) + "T00:00:00");
+        var fri = new Date(mon.getTime()); fri.setDate(fri.getDate() + 4);
+        var title = (mon.getMonth()+1) + "/" + mon.getDate() + "〜" + (fri.getMonth()+1) + "/" + fri.getDate();
+
+        var tablesHtml = sections.map(function(sec) {
+            var rows = props.carNames.map(function(cname, ci) {
+                var driverCells = weekDates.map(function(wd) {
+                    return '<td style="background:#e8f0fe;font-size:10px;padding:2px 4px;border:1px solid #c0ccda;text-align:center;">—</td>';
+                }).join("");
+                var seatRowsHtml = Array(SEAT_COUNT).fill(null).map(function(_, si) {
+                    var cells = weekDates.map(function(wd) {
+                        var dayGrid = allGrids[wd.key];
+                        var seat = dayGrid && dayGrid[sec.period] && dayGrid[sec.period][ci] && dayGrid[sec.period][ci][si];
+                        var name = seat ? seat.name : "";
+                        var time = seat ? seat.time : "";
+                        var seatNo = seat ? seat.seatNo : "";
+                        var bg = colorBgMap[seat && seat.color || ""] || (name ? "#f1f8e9" : "#fff");
+                        return '<td style="background:' + bg + ';font-size:10px;padding:2px 4px;border:1px solid #e0e7ef;">' +
+                            (name ? '<b>' + name + '</b>' + (time ? '<br><span style="color:#555;font-size:9px;">' + time + (seatNo ? " " + seatNo : "") + '</span>' : '') : '<span style="color:#ccc;">—</span>') +
+                            '</td>';
+                    }).join("");
+                    return '<tr>' + '<td style="border:1px solid #e0e7ef;background:#f8fafc;"></td>' + cells + '</tr>';
+                }).join("");
+                var totalCells = weekDates.map(function(wd) {
+                    var dayGrid = allGrids[wd.key];
+                    var count = 0;
+                    if (dayGrid && dayGrid[sec.period] && dayGrid[sec.period][ci]) {
+                        dayGrid[sec.period][ci].forEach(function(s) { if (s.name) count++; });
+                    }
+                    return '<td style="background:#f0f4f8;font-size:10px;font-weight:bold;padding:2px 4px;border:1px solid #c0ccda;text-align:center;color:' + (count > 0 ? "#1e3a5f" : "#aaa") + ';">' + count + '名</td>';
+                }).join("");
+                return '<tr><td rowspan="' + (SEAT_COUNT + 2) + '" style="background:#1e3a5f;color:white;font-weight:bold;font-size:11px;padding:4px;text-align:center;border:1px solid #374151;vertical-align:middle;">' + cname + '</td>' +
+                    driverCells + '</tr>' + seatRowsHtml +
+                    '<tr style="border-bottom:3px solid #1e3a5f;"><td style="background:#f0f4f8;font-size:10px;font-weight:bold;padding:2px 4px;border:1px solid #c0ccda;text-align:center;">合計</td>' + totalCells + '</tr>';
+            }).join("");
+            var headCells = weekDates.map(function(wd) {
+                return '<th style="background:#1e3a5f;color:white;font-size:10px;padding:4px 2px;border:1px solid #374151;text-align:center;">' + wd.label + '</th>';
+            }).join("");
+            return '<div style="margin-bottom:12px;">' +
+                '<div style="background:#2d6a9f;color:white;font-weight:bold;font-size:12px;padding:4px 8px;border-radius:4px 4px 0 0;">' + sec.label + '</div>' +
+                '<table style="width:100%;border-collapse:collapse;">' +
+                '<thead><tr><th style="background:#1e3a5f;color:white;font-size:11px;padding:4px;border:1px solid #374151;width:50px;">号車</th>' + headCells + '</tr></thead>' +
+                '<tbody>' + rows + '</tbody></table></div>';
+        }).join("");
+
+        return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
+            '<style>body{font-family:sans-serif;margin:8px;font-size:11px;}@page{size:A4 landscape;margin:8mm;}@media print{body{margin:0;}}</style>' +
+            '</head><body><h2 style="margin:0 0 6px;font-size:13px;">デイサービス送迎表　' + title + '</h2>' +
+            tablesHtml + '</body></html>';
+    }
+
+    function printWeek(sections) {
+        var html = buildWeekPrintHtml(sections);
+        var w = window.open("", "_blank");
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        setTimeout(function() { w.print(); }, 400);
+    }
+
+    return React.createElement("div", { style: { width: "100%", maxWidth: "100%", fontFamily: "sans-serif", boxSizing: "border-box", overflowX: "hidden" } },
+        // Section selector + zoom + print + color buttons
+        React.createElement("div", { style: { display: "flex", gap: 4, padding: "6px 6px 0", flexWrap: "wrap", alignItems: "center" } },
+            WEEK_SECTIONS.map(function(s, i) {
+                return React.createElement("button", { key: i, onClick: function() { setSection(i); }, style: {
+                    padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer",
+                    background: section === i ? "#1e3a5f" : "#e3f2fd",
+                    color: section === i ? "white" : "#1e3a5f",
+                } }, s.label);
+            }),
+            // ── 色編集ボタン＋パレット ──
+            React.createElement("button", { onClick: function() { setWeekColorMode(function(v) { if(v) setWeekPaintColor(""); return !v; }); }, style: {
+                padding: "4px 10px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
+                background: weekColorMode ? "#1e3a5f" : "#e2e8f0",
+                color: weekColorMode ? "white" : "#718096",
+            } }, weekColorMode ? "🎨 色編集ON" : "🎨 色編集"),
+            weekColorMode && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" } },
+                [["", "#e2e8f0", "なし"], ["gray", "#64748b", "灰"], ["yellow", "#facc15", "黄"], ["cyan", "#0ea5e9", "水"], ["green", "#16a34a", "緑"]].map(function(item) {
+                    var cv = item[0], cc = item[1], label = item[2];
+                    var isSel = weekPaintColor === cv;
+                    return React.createElement("div", { key: cv, onClick: function() { setWeekPaintColor(cv); }, style: {
+                        width: 28, height: 28, borderRadius: 6,
+                        background: cv === "" ? "white" : cc,
+                        border: isSel ? "2.5px solid #1e3a5f" : "1.5px solid #b0bec5",
+                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 9, fontWeight: 700,
+                        color: cv === "yellow" ? "#78350f" : cv === "gray" ? "#1e293b" : cv === "cyan" ? "#0c4a6e" : cv === "green" ? "#14532d" : "#64748b",
+                        boxShadow: isSel ? "0 0 0 2px #2d6a9f55" : "none",
+                        flexShrink: 0,
+                    } }, label);
+                })),
+            // ── ズームコントロール ──
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 2, background: "rgba(30,58,95,.1)", borderRadius: 20, padding: "3px 6px" } },
+                React.createElement("button", { onClick: function() { setZoom(function(z) { return Math.max(0.4, parseFloat((z - 0.1).toFixed(2))); }); }, style: { background: "none", border: "none", color: "#1e3a5f", fontSize: 15, cursor: "pointer", padding: "0 2px", fontWeight: 700, lineHeight: 1 } }, "−"),
+                React.createElement("span", { style: { fontSize: 10, color: "#1e3a5f", minWidth: 32, textAlign: "center", fontWeight: 700 } }, Math.round(zoom * 100) + "%"),
+                React.createElement("button", { onClick: function() { setZoom(function(z) { return Math.min(2, parseFloat((z + 0.1).toFixed(2))); }); }, style: { background: "none", border: "none", color: "#1e3a5f", fontSize: 15, cursor: "pointer", padding: "0 2px", fontWeight: 700, lineHeight: 1 } }, "＋")),
+            React.createElement("div", { style: { marginLeft: "auto", position: "relative" } },
+                React.createElement("button", { onClick: function() { setShowPrintMenu(function(v) { return !v; }); }, style: {
+                    padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                    border: "1px solid #e0e7ef", cursor: "pointer", background: "white",
+                    color: "#1e3a5f", whiteSpace: "nowrap",
+                } }, "🖨 印刷 ▾"),
+                showPrintMenu && React.createElement("div", { style: {
+                    position: "absolute", top: "calc(100% + 4px)", right: 0,
+                    background: "white", border: "1.5px solid #e0e7ef", borderRadius: 10,
+                    boxShadow: "0 4px 16px rgba(0,0,0,.12)", zIndex: 100,
+                    overflow: "hidden", minWidth: 130,
+                } },
+                    React.createElement("button", { onClick: function() { printWeek([WEEK_SECTIONS[0]]); setShowPrintMenu(false); }, style: {
+                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                        background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                    } }, "🌅 AM 迎え"),
+                    React.createElement("button", { onClick: function() { printWeek([WEEK_SECTIONS[1]]); setShowPrintMenu(false); }, style: {
+                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                        background: "white", border: "none",
+                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                    } }, "🌇 PM 迎え")))),
+        // Table（ピンチ／ズーム対応ラッパー）
+        React.createElement("div", {
+            ref: pinchRef,
+            onTouchStart: onPinchStart,
+            onTouchMove: onPinchMove,
+            onTouchEnd: onPinchEnd,
+            style: { transformOrigin: "top left", transform: "scale(" + zoom + ")", width: (100 / zoom) + "%" }
+        },
+        // 列幅: 運転者(縦書き)4% | 号車4% | 日付×5 (92%÷5=18.4%ずつ)
+        React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: 6 } },
+            React.createElement("thead", null,
+                React.createElement("tr", null,
+                    React.createElement("th", { style: { width: "4%", background: "#1e3a5f", color: "white", fontSize: 8, padding: "4px 1px", border: "1px solid #374151", textAlign: "center", writingMode: "vertical-rl", textOrientation: "upright" } }, "運転者"),
+                    React.createElement("th", { style: { width: "4%", background: "#1e3a5f", color: "white", fontSize: 8, padding: "4px 1px", border: "1px solid #374151", textAlign: "center", writingMode: "vertical-rl", textOrientation: "upright" } }, "号車"),
+                    weekDates.map(function(wd) {
+                        var isSel = wd.key === selectedDate;
+                        return React.createElement("th", { key: wd.key, style: {
+                            width: "18.4%", background: isSel ? "#2d6a9f" : "#1e3a5f",
+                            color: "white", fontSize: 9, padding: "4px 1px", textAlign: "center",
+                            border: "1px solid #374151", wordBreak: "break-all", lineHeight: 1.3,
+                        } }, wd.label);
+                    }))),
+            React.createElement("tbody", null,
+                carNames.map(function(carName, ci) {
+                    var maxSeats = SEAT_COUNT;
+
+                    // 座席行：si=0 の行だけ運転者列・号車列を rowspan で結合
+                    var seatRows = Array(maxSeats).fill(null).map(function(_, si) {
+                        var leftCells = [];
+                        if (si === 0) {
+                            // 週の中で最もよく設定されている運転者名を代表として表示
+                            var drName = "";
+                            for (var wi = 0; wi < weekDates.length; wi++) {
+                                var wdKey = weekDates[wi].key;
+                                var dayDrv = allGrids[wdKey] && allGrids[wdKey].drivers && allGrids[wdKey].drivers[ci];
+                                if (dayDrv) { drName = dayDrv; break; }
+                            }
+                            // 運転者列（縦書き）
+                            leftCells.push(React.createElement("td", {
+                                key: "drv-" + ci,
+                                rowSpan: maxSeats,
+                                style: {
+                                    background: "#1e3a5f", color: "white",
+                                    fontSize: drName.length >= 4 ? 7 : 8,
+                                    fontWeight: 700, padding: "2px 0px",
+                                    border: "1px solid #374151", textAlign: "center",
+                                    verticalAlign: "middle",
+                                    writingMode: "vertical-rl",
+                                    textOrientation: "upright",
+                                    letterSpacing: "0.05em",
+                                    wordBreak: "break-all",
+                                }
+                            }, drName || "—"));
+                            // 号車列
+                            leftCells.push(React.createElement("td", {
+                                key: "car-" + ci,
+                                rowSpan: maxSeats,
+                                style: {
+                                    background: "#2d6a9f", color: "white",
+                                    fontSize: carName.length >= 4 ? 7 : 8,
+                                    fontWeight: 700, padding: "2px 0px",
+                                    border: "1px solid #374151", textAlign: "center",
+                                    verticalAlign: "middle",
+                                    writingMode: "vertical-rl",
+                                    textOrientation: "upright",
+                                    letterSpacing: "0.05em",
+                                    wordBreak: "break-all",
+                                }
+                            }, carName));
+                        }
+                        var dateCells = weekDates.map(function(wd) {
+                            var dayGrid = allGrids[wd.key];
+                            var seat = dayGrid && dayGrid[sec.period] && dayGrid[sec.period][ci] && dayGrid[sec.period][ci][si];
+                            var name = seat ? seat.name : "";
+                            var time = seat ? seat.time : "";
+                            var seatNo = seat ? seat.seatNo : "";
+                            var color = seat ? (seat.color || "") : "";
+                            var bg = COLOR_BG_MAP[color] || (name ? "#f1f8e9" : "#fafafa");
+                            var surname = getSurname(name);
+                            var nameFontSize = surname.length >= 4 ? 9 : surname.length === 3 ? 10 : 11;
+                            var canPaint = weekColorMode && !!name;
+                            return React.createElement("td", { key: wd.key,
+                                onClick: canPaint ? function() { setSeatWeekColor(wd.key, sec.period, ci, si, weekPaintColor); } : undefined,
+                                style: {
+                                background: bg, padding: "2px 1px",
+                                border: canPaint ? "1.5px solid #1e3a5f" : "1px solid #e0e7ef",
+                                verticalAlign: "middle", textAlign: "center",
+                                cursor: canPaint ? "crosshair" : "default",
+                            } },
+                                surname ? React.createElement("div", null,
+                                    React.createElement("div", { style: {
+                                        fontWeight: 700, color: "#1e3a5f",
+                                        fontSize: nameFontSize,
+                                        overflowWrap: "break-word", wordBreak: "break-all",
+                                        lineHeight: 1.2, textAlign: "center",
+                                    } }, surname),
+                                    (time || seatNo) && React.createElement("div", { style: { color: "#718096", fontSize: 8, textAlign: "center" } }, [time, seatNo].filter(Boolean).join(" "))
+                                ) : React.createElement("div", { style: { color: "#ddd", fontSize: 9, textAlign: "center" } }, "—"));
+                        });
+                        return React.createElement("tr", { key: "seat-" + ci + "-" + si },
+                            leftCells,
+                            dateCells);
+                    });
+
+                    // 号車ごとの合計行は不要 → seatRowsのみ返す
+                    // 各号車ブロックの区切りとして下罫線を最終行に付与
+                    return seatRows.map(function(row, ri) {
+                        if (ri !== seatRows.length - 1) return row;
+                        return React.createElement("tr", Object.assign({}, row.props, { key: row.props.key, style: { borderBottom: "2px solid #1e3a5f" } }),
+                            row.props.children);
+                    });
+                }),
+                // ── 4台分の合計行（最下部に1行だけ）──
+                React.createElement("tr", { style: { borderTop: "3px solid #1e3a5f" } },
+                    React.createElement("td", { colSpan: 2, style: {
+                        background: "#1e3a5f", color: "white", fontSize: 10, fontWeight: 700,
+                        padding: "4px 2px", border: "1px solid #374151",
+                        textAlign: "center",
+                    } }, "合計"),
+                    weekDates.map(function(wd) {
+                        var dayGrid = allGrids[wd.key];
+                        var total = 0;
+                        if (dayGrid && dayGrid[sec.period]) {
+                            dayGrid[sec.period].forEach(function(car) {
+                                car.forEach(function(s) { if (s.name) total++; });
+                            });
+                        }
+                        return React.createElement("td", { key: wd.key, style: {
+                            background: "#1e3a5f", color: "white",
+                            fontSize: 11, fontWeight: 800, padding: "4px 2px",
+                            border: "1px solid #374151", textAlign: "center",
+                        } }, total > 0 ? total + "名" : "0");
+                    }))
+            )))
+        );
+}
 function App() {
     var today = new Date();
+    // ── localStorage から前回のデータを復元 ─────────────────────────────
+    var _saved = (function() {
+        try {
+            var s = localStorage.getItem("ds_autosave");
+            if (s) return JSON.parse(s);
+        } catch(e) {}
+        return null;
+    })();
+    // ds_XXX キーで保存されたデータ → autosave内のキー名マッピング
+    var _autoKeyMap = { "ds_grids": "allGrids", "ds_people": "people", "ds_absent": "absent", "ds_carNames": "carNames", "ds_drivers": "drivers", "ds_driverList": "driverList" };
+    function _load(key, fallback) {
+        try {
+            var v = localStorage.getItem(key);
+            if (v) {
+                var parsed = JSON.parse(v);
+                // people配列はdays/periodsフィールドを必ず補完
+                if (key === "ds_people" && Array.isArray(parsed)) {
+                    return parsed.map(function(p) { return Object.assign({ days: [], periods: [] }, p); });
+                }
+                return parsed;
+            }
+            if (_saved) {
+                var autoKey = _autoKeyMap[key] || key;
+                if (_saved[autoKey] !== undefined) {
+                    var av = _saved[autoKey];
+                    if (key === "ds_people" && Array.isArray(av)) {
+                        return av.map(function(p) { return Object.assign({ days: [], periods: [] }, p); });
+                    }
+                    return av;
+                }
+            }
+        } catch(e) {}
+        return fallback;
+    }
+
     var [viewYear, setViewYear] = useState(today.getFullYear());
     var [viewMonth, setViewMonth] = useState(today.getMonth());
     var [selectedDate, setSelectedDate] = useState(null);
     var [period, setPeriod] = useState("AM");
     var [zoom, setZoom] = useState(1);
-    var [allGrids, setAllGrids] = useState({});
+    var [allGrids, setAllGrids] = useState(function() { return _load("ds_grids", {}); });
     var [openKey, setOpenKey] = useState(null);
     var [search, setSearch] = useState("");
-    var [carNames, setCarNames] = useState(INIT_CARS.slice());
+    var [carNames, setCarNames] = useState(function() { return _load("ds_carNames", INIT_CARS.slice()); });
     var [editingCar, setEditingCar] = useState(null);
-    var [drivers, setDrivers] = useState(["", "", "", ""]);
-    var [driverList, setDriverList] = useState([]);
+    var [drivers, setDrivers] = useState(function() { return _load("ds_drivers", ["", "", "", ""]); });
+    var [driverList, setDriverList] = useState(function() { return _load("ds_driverList", []); });
     var [openDriverKey, setOpenDriverKey] = useState(null);
     var [newDriverName, setNewDriverName] = useState("");
     var [showDriverEdit, setShowDriverEdit] = useState(false);
-    var [people, setPeople] = useState(INIT_PEOPLE);
-    var [absent, setAbsent] = useState(new Set());
+    var [people, setPeople] = useState(function() {
+        var p = _load("ds_people", null);
+        if (p && Array.isArray(p) && p.length > 0) return p;
+        return INIT_PEOPLE;
+    });
+    var [absent, setAbsent] = useState(function() {
+        var a = _load("ds_absent", null);
+        return a && Array.isArray(a) ? new Set(a) : new Set();
+    });
     var [editingPerson, setEditingPerson] = useState(null);
     var [editingVal, setEditingVal] = useState("");
     var [showPeopleEdit, setShowPeopleEdit] = useState(false);
@@ -409,13 +532,21 @@ function App() {
     var [toast, setToast] = useState("");
     var [receiveSuccess, setReceiveSuccess] = useState(false);
     var [direction, setDirection] = useState("迎え");
+    var [paintColor, setPaintColor] = useState("");
+    var [colorEditMode, setColorEditMode] = useState(false);
+    var [showDayPrintMenu, setShowDayPrintMenu] = useState(false);
     var [dragSeatSrc, setDragSeatSrc] = useState(null);
     var [dragSeatDst, setDragSeatDst] = useState(null);
     var seatGridRef = useRef(null);
     var touchSeatSrc = useRef(null);
+    var longPressTimer = useRef(null);
+    var [quickDragMode, setQuickDragMode] = useState(false);
+    var [ghostPos, setGhostPos] = useState({ x: 0, y: 0 });
+    var [ghostName, setGhostName] = useState("");
     var [dupConfirm, setDupConfirm] = useState(null);
     var [newName, setNewName] = useState("");
     var [memoOpen, setMemoOpen] = useState(null);
+    var [scheduleOpen, setScheduleOpen] = useState(null);
     var [openMemoCar, setOpenMemoCar] = useState(null);
     var [calView, setCalView] = useState("month");
     var [viewDate, setViewDate] = useState(new Date(today.getTime()));
@@ -426,6 +557,7 @@ function App() {
     var [bulkDays, setBulkDays] = useState([1, 2, 3, 4, 5]);
     var [bulkPeriod, setBulkPeriod] = useState("both");
     var [showWeekCopy, setShowWeekCopy] = useState(false);
+    var [showWeekTable, setShowWeekTable] = useState(false);
     var [weekCopySource, setWeekCopySource] = useState(null);
     var [weekCopyTargets, setWeekCopyTargets] = useState([]);
     var [weekCopyPeriod, setWeekCopyPeriod] = useState("both");
@@ -481,6 +613,11 @@ function App() {
         }
         catch (e) { }
     }, [allGrids, people, absent, carNames, drivers, driverList]);
+    // people変更時はds_peopleキーにも即座に同期（全画面共通）
+    useEffect(function () {
+        try { localStorage.setItem("ds_people", JSON.stringify(people)); }
+        catch (e) { }
+    }, [people]);
     function handleSave() {
         try {
             localStorage.setItem("ds_grids", JSON.stringify(allGrids));
@@ -495,6 +632,86 @@ function App() {
             setSaveStatus("err");
         }
         setTimeout(function () { setSaveStatus(""); }, 2000);
+    }
+    function handlePrint() {
+        if (!selectedDate || !grid) return;
+        handlePrintSection("both");
+    }
+    function handlePrintSection(mode) {
+        if (!selectedDate || !grid) return;
+        var colorBgMap = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
+        var dayDrivers = (allGrids[selectedDate] && allGrids[selectedDate].drivers) ? allGrids[selectedDate].drivers : ["","","",""];
+        var sections = mode === "AM"
+            ? [{ label: "AM 迎え", data: grid.AM }]
+            : mode === "PM"
+            ? [{ label: "PM 迎え", data: grid.PM }]
+            : [{ label: "AM 迎え", data: grid.AM }, { label: "PM 迎え", data: grid.PM }];
+        var carsHtml = carNames.map(function(cname, ci) {
+            return '<div class="car-block">' +
+                sections.map(function(sec) {
+                    var rows = sec.data[ci].map(function(seat) {
+                        if (!seat.name) return '';
+                        var bg = colorBgMap[seat.color || ""] || "#fff";
+                        var timeStr = seat.time || "";
+                        var seatStr = seat.seatNo || "";
+                        return '<tr style="background:' + bg + '">' +
+                            '<td class="name">' + seat.name + '</td>' +
+                            '<td class="time">' + timeStr + '</td>' +
+                            '<td class="seatno">' + seatStr + '</td>' +
+                            '</tr>';
+                    }).join("");
+                    return '<div class="section">' +
+                        '<div class="sec-label">' + sec.label + '</div>' +
+                        '<table>' +
+                        '<thead><tr><th>氏名</th><th>時間</th><th>席</th></tr></thead>' +
+                        '<tbody>' + (rows || '<tr><td colspan="3" style="color:#aaa;text-align:center">なし</td></tr>') + '</tbody>' +
+                        '</table></div>';
+                }).join("") +
+                '</div>';
+        });
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+            '<title>' + selectedDate + ' 送迎表</title>' +
+            '<style>' +
+            'body{font-family:sans-serif;margin:10px;font-size:11px;}' +
+            'h1{font-size:14px;margin:0 0 8px;}' +
+            '.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}' +
+            '.car-block{border:2px solid #1e3a5f;border-radius:6px;overflow:hidden;break-inside:avoid;}' +
+            '.car-name{background:#1e3a5f;color:white;font-weight:bold;font-size:12px;padding:4px 8px;}' +
+            '.driver-name{background:#2d6a9f;color:white;font-size:10px;padding:2px 8px;}' +
+            'table{width:100%;border-collapse:collapse;}' +
+            'th{background:#f0f4f8;font-size:9px;padding:2px 4px;border-bottom:1px solid #ddd;text-align:left;}' +
+            'td{padding:2px 4px;border-bottom:1px solid #f0f0f0;font-size:10px;}' +
+            '@media print{body{margin:5px;}}' +
+            '</style></head><body>' +
+            '<h1>デイサービス送迎表　' + selectedDate + '　' + (mode === "AM" ? "AM迎え" : mode === "PM" ? "PM迎え" : "AM・PM迎え") + '</h1>' +
+            '<div class="grid">' +
+            carNames.map(function(cname, ci) {
+                var drv = dayDrivers[ci] || "";
+                return '<div class="car-block">' +
+                    '<div class="car-name">' + cname + '</div>' +
+                    (drv ? '<div class="driver-name">🧑‍✈️ ' + drv + '</div>' : '') +
+                    sections.map(function(sec) {
+                        var rows = sec.data[ci].filter(function(s){ return s.name; }).map(function(seat) {
+                            var bg = colorBgMap[seat.color || ""] || "#fff";
+                            return '<tr style="background:' + bg + '">' +
+                                '<td style="padding:2px 4px;font-size:10px;border-bottom:1px solid #f0f0f0;">' + seat.name + '</td>' +
+                                '<td style="padding:2px 4px;font-size:10px;color:#1e3a5f;font-weight:bold;white-space:nowrap;border-bottom:1px solid #f0f0f0;">' + (seat.time||"") + '</td>' +
+                                '<td style="padding:2px 4px;font-size:10px;color:#555;border-bottom:1px solid #f0f0f0;">' + (seat.seatNo||"") + '</td>' +
+                                '</tr>';
+                        }).join("") || '<tr><td colspan="3" style="padding:3px 4px;font-size:9px;color:#aaa;text-align:center;">なし</td></tr>';
+                        return (sections.length > 1 ? '<div style="background:#e8f0fe;font-weight:bold;font-size:10px;padding:2px 6px;border-bottom:1px solid #ddd;border-top:1px solid #ddd;">' + sec.label + '</div>' : '') +
+                            '<table style="width:100%;border-collapse:collapse;">' +
+                            '<thead><tr><th>氏名</th><th>時間</th><th>席</th></tr></thead>' +
+                            '<tbody>' + rows + '</tbody></table>';
+                    }).join("") +
+                    '</div>';
+            }).join("") +
+            '</div></body></html>';
+        var w = window.open("", "_blank");
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        setTimeout(function() { w.print(); }, 400);
     }
     var grid = selectedDate ? (allGrids[selectedDate] || mkDay()) : null;
     var assigned = useMemo(function () {
@@ -556,6 +773,7 @@ function App() {
     }
     function setSeatNo(ci, si, v) { updateGrid(function (g) { g[period][ci][si].seatNo = v; }); }
     function setTime(ci, si, v) { updateGrid(function (g) { g[period][ci][si].time = v; }); }
+    function setSeatColor(ci, si, v) { updateGrid(function (g) { g[period][ci][si].color = v; }); }
     function toggleAbsent(name) {
         setAbsent(function (prev) {
             var next = new Set(prev);
@@ -622,6 +840,29 @@ function App() {
             });
         });
     }
+    function toggleScheduleDay(name, dayIdx) {
+        setPeople(function (prev) {
+            return prev.map(function (p) {
+                if (p.name !== name) return p;
+                var days = (p.days || []).slice();
+                var pos = days.indexOf(dayIdx);
+                if (pos >= 0) days.splice(pos, 1); else days.push(dayIdx);
+                return Object.assign({}, p, { days: days });
+            });
+        });
+    }
+    function toggleSchedulePeriod(name, period) {
+        setPeople(function (prev) {
+            return prev.map(function (p) {
+                if (p.name !== name) return p;
+                var periods = (p.periods || []).slice();
+                var pos = periods.indexOf(period);
+                if (pos >= 0) periods.splice(pos, 1); else periods.push(period);
+                return Object.assign({}, p, { periods: periods });
+            });
+        });
+    }
+    function toggleScheduleOpen(idx) { setScheduleOpen(function (prev) { return prev === idx ? null : idx; }); }
     function applyBulk() {
         var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
         var sourceGrid = bulkSource ? (allGrids[bulkSource] || mkDay()) : mkDay();
@@ -650,12 +891,7 @@ function App() {
         });
         setShowBulk(false);
     }
-    function getMondayKey(date) {
-        var d = new Date(date);
-        var dow = d.getDay();
-        d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-        return toKey(d.getFullYear(), d.getMonth(), d.getDate());
-    }
+    // getMondayKey はグローバルスコープの関数を使用
     var weeksWithData = useMemo(function () {
         var mondays = {};
         Object.keys(allGrids).forEach(function (k) {
@@ -772,8 +1008,25 @@ function App() {
         setDayCopyTargets([]);
         setDayCopySource(null);
     }
+    // 選択日の曜日インデックス（月=0〜金=4）を取得
+    var selectedDayIdx = (function() {
+        if (!selectedDate) return null;
+        var dow = new Date(selectedDate + "T00:00:00").getDay(); // 0=日,1=月...6=土
+        var map = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 }; // DAY_LABELS["月","火","水","木","金"]に対応
+        return map[dow] !== undefined ? map[dow] : null;
+    })();
     var filtered = people.filter(function (p) {
-        return p.name.indexOf(search) !== -1 && !absent.has(p.name);
+        if (p.name.indexOf(search) === -1) return false;
+        if (absent.has(p.name)) return false;
+        // 曜日未登録の人は表示しない
+        if (!p.days || p.days.length === 0) return false;
+        // 時間帯未登録の人は表示しない
+        if (!p.periods || p.periods.length === 0) return false;
+        // 選択日の曜日が登録されていない人は表示しない
+        if (selectedDayIdx !== null && p.days.indexOf(selectedDayIdx) === -1) return false;
+        // 現在の時間帯が登録されていない人は表示しない
+        if (p.periods.indexOf(period) === -1) return false;
+        return true;
     });
     var total = assigned.size;
     var usageCount = useMemo(function () {
@@ -792,7 +1045,16 @@ function App() {
         return counts;
     }, [allGrids, people]);
     var sortedPeople = useMemo(function () {
-        var list = people.slice();
+        var list = people.slice().filter(function(p) {
+            // カレンダー画面（日付未選択）は全員表示して登録できるようにする
+            if (!selectedDate) return true;
+            // 日次・週次画面では曜日・時間帯でフィルター
+            if (!p.days || p.days.length === 0) return false;
+            if (!p.periods || p.periods.length === 0) return false;
+            if (selectedDayIdx !== null && p.days.indexOf(selectedDayIdx) === -1) return false;
+            if (p.periods.indexOf(period) === -1) return false;
+            return true;
+        });
         if (peopleSort === "name") {
             list.sort(function (a, b) { return a.name.localeCompare(b.name, "ja"); });
         }
@@ -802,30 +1064,47 @@ function App() {
             });
         }
         return list;
-    }, [people, peopleSort, usageCount]);
+    }, [people, peopleSort, usageCount, selectedDayIdx, period, selectedDate]);
     var calDays = useMemo(function () {
         var last = new Date(viewYear, viewMonth + 1, 0).getDate();
         var cells = [];
+        // 月初の曜日を取得して月〜金グリッドの先頭オフセットを計算
+        // getDay(): 0=日,1=月,2=火,3=水,4=木,5=金,6=土
+        // 月〜金グリッドなので月=0列目、火=1列目...金=4列目
+        // 月初が水曜(3)なら先頭に月・火の2セル分null挿入
+        var firstDow = new Date(viewYear, viewMonth, 1).getDay();
+        // 月曜始まりのオフセット（月=0,火=1,水=2,木=3,金=4,土/日は無視）
+        var offset = firstDow === 0 ? 0 : Math.max(0, firstDow - 1); // 日曜なら次週月曜扱いで0
+        // 先頭に空セルを挿入
+        for (var n = 0; n < offset && n < 5; n++) cells.push(null);
         for (var d = 1; d <= last; d++) {
             var dow = new Date(viewYear, viewMonth, d).getDay();
             if (dow !== 0 && dow !== 6)
                 cells.push(d);
+            else if (dow === 0) {
+                // 日曜の翌日が月曜なので何もしない（平日のみ追加）
+            }
         }
         return cells;
     }, [viewYear, viewMonth]);
     function getDaySummary(d) {
-        if (!d)
-            return null;
+        if (!d) return null;
         var g = allGrids[toKey(viewYear, viewMonth, d)];
-        if (!g)
-            return null;
+        if (!g) return null;
         var am = new Set(), pm = new Set();
-        g.AM.forEach(function (car) { car.forEach(function (s) { if (s.name)
-            am.add(s.name); }); });
-        g.PM.forEach(function (car) { car.forEach(function (s) { if (s.name)
-            pm.add(s.name); }); });
-        if (am.size === 0 && pm.size === 0)
-            return null;
+        // AMに配置されていて、かつpeopleのperiodsにAMが含まれる人のみカウント
+        g.AM.forEach(function (car) { car.forEach(function (s) {
+            if (!s.name) return;
+            var p = people.find(function(pp) { return pp.name === s.name; });
+            if (!p || !p.periods || p.periods.length === 0 || p.periods.indexOf("AM") >= 0) am.add(s.name);
+        }); });
+        // PMに配置されていて、かつpeopleのperiodsにPMが含まれる人のみカウント
+        g.PM.forEach(function (car) { car.forEach(function (s) {
+            if (!s.name) return;
+            var p = people.find(function(pp) { return pp.name === s.name; });
+            if (!p || !p.periods || p.periods.length === 0 || p.periods.indexOf("PM") >= 0) pm.add(s.name);
+        }); });
+        if (am.size === 0 && pm.size === 0) return null;
         return { am: am.size, pm: pm.size };
     }
     var weekData = useMemo(function () {
@@ -839,11 +1118,11 @@ function App() {
             if (d.getDay() !== 0 && d.getDay() !== 6)
                 days.push(d);
         }
-        var sun = new Date(mon.getTime());
-        sun.setDate(sun.getDate() + 6);
+        var fri = new Date(mon.getTime());
+        fri.setDate(fri.getDate() + 4);
         var label = (mon.getMonth() + 1) + "/" + mon.getDate() +
-            " - " +
-            (sun.getMonth() + 1) + "/" + sun.getDate();
+            "〜" +
+            (fri.getMonth() + 1) + "/" + fri.getDate();
         return { days: days, label: label };
     }, [viewDate]);
     var dayKey = toKey(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate());
@@ -898,12 +1177,12 @@ function App() {
     }
     function navDatePrev() {
         var d = new Date(selectedDate + "T00:00:00");
-        d.setDate(d.getDate() - 1);
+        do { d.setDate(d.getDate() - 1); } while (d.getDay() === 0 || d.getDay() === 6);
         setSelectedDate(toKey(d.getFullYear(), d.getMonth(), d.getDate()));
     }
     function navDateNext() {
         var d = new Date(selectedDate + "T00:00:00");
-        d.setDate(d.getDate() + 1);
+        do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
         setSelectedDate(toKey(d.getFullYear(), d.getMonth(), d.getDate()));
     }
     var navTitle = calView === "month"
@@ -930,13 +1209,25 @@ function App() {
     function handleNewNameChange(e) { setNewName(e.target.value); }
     function handleNewNameKeyDown(e) {
         if (e.key === "Enter" && newName.trim()) {
-            setPeople(function (prev) { return prev.concat([{ name: newName.trim(), memo: "" }]); });
+            var trimmed = newName.trim();
+            if (people.some(function (p) { return p.name === trimmed; })) {
+                setToast("同じ名前の利用者が既に存在します");
+                setTimeout(function () { setToast(""); }, 2000);
+                return;
+            }
+            setPeople(function (prev) { return prev.concat([{ name: trimmed, memo: "", days: [], periods: [] }]); });
             setNewName("");
         }
     }
     function handleAddPerson() {
         if (newName.trim()) {
-            setPeople(function (prev) { return prev.concat([{ name: newName.trim(), memo: "" }]); });
+            var trimmed = newName.trim();
+            if (people.some(function (p) { return p.name === trimmed; })) {
+                setToast("同じ名前の利用者が既に存在します");
+                setTimeout(function () { setToast(""); }, 2000);
+                return;
+            }
+            setPeople(function (prev) { return prev.concat([{ name: trimmed, memo: "", days: [], periods: [] }]); });
             setNewName("");
         }
     }
@@ -961,15 +1252,27 @@ function App() {
     function handleCarNameKeyDown(e) { if (e.key === "Enter")
         setEditingCar(null); }
     function handleDriverSelect(ci, d) {
-        var n = drivers.slice();
-        n[ci] = d;
-        setDrivers(n);
+        if (!selectedDate) return;
+        setAllGrids(function(prev) {
+            var next = Object.assign({}, prev);
+            var day = next[selectedDate] ? JSON.parse(JSON.stringify(next[selectedDate])) : mkDay();
+            if (!day.drivers) day.drivers = ["", "", "", ""];
+            day.drivers[ci] = d;
+            next[selectedDate] = day;
+            return next;
+        });
         setOpenDriverKey(null);
     }
     function handleDriverClear(ci) {
-        var n = drivers.slice();
-        n[ci] = "";
-        setDrivers(n);
+        if (!selectedDate) return;
+        setAllGrids(function(prev) {
+            var next = Object.assign({}, prev);
+            var day = next[selectedDate] ? JSON.parse(JSON.stringify(next[selectedDate])) : mkDay();
+            if (!day.drivers) day.drivers = ["", "", "", ""];
+            day.drivers[ci] = "";
+            next[selectedDate] = day;
+            return next;
+        });
         setOpenDriverKey(null);
     }
     function handleSearchChange(e) { setSearch(e.target.value); }
@@ -1029,7 +1332,16 @@ function App() {
     function toggleMemoOpen(idx) { setMemoOpen(function (prev) { return prev === idx ? null : idx; }); }
     function removeDriverAt(i, d) {
         setDriverList(function (prev) { return prev.filter(function (_, j) { return j !== i; }); });
-        setDrivers(function (prev) { return prev.map(function (v) { return v === d ? "" : v; }); });
+        // allGrids内の全日付でこのドライバー名をクリア
+        setAllGrids(function(prev) {
+            var next = JSON.parse(JSON.stringify(prev));
+            Object.keys(next).forEach(function(dateKey) {
+                if (next[dateKey].drivers) {
+                    next[dateKey].drivers = next[dateKey].drivers.map(function(v) { return v === d ? "" : v; });
+                }
+            });
+            return next;
+        });
     }
     function getPeopleDataText() {
         var data = { type: "dscar_people_v1", people: people };
@@ -1054,7 +1366,10 @@ function App() {
                     setReceiveError("データが空です");
                     return;
                 }
-                var newPeople = names.map(function (n) { return { name: n.trim(), memo: "" }; });
+                if (people.length > 0 && !window.confirm("現在の利用者リスト（" + people.length + "名）を上書きします。よろしいですか？")) {
+                    return;
+                }
+                var newPeople = names.map(function (n) { return { name: n.trim(), memo: "", days: [], periods: [] }; });
                 setPeople(newPeople);
                 setReceiveSuccess(true);
                 setReceiveText("");
@@ -1066,7 +1381,14 @@ function App() {
                 setReceiveError("データの形式が正しくありません");
                 return;
             }
-            setPeople(data.people);
+            if (people.length > 0 && !window.confirm("現在の利用者リスト（" + people.length + "名）を上書きします。よろしいですか？")) {
+                return;
+            }
+            // days/periodsが欠落している場合は補完
+            var imported = data.people.map(function (p) {
+                return Object.assign({ days: [], periods: [] }, p);
+            });
+            setPeople(imported);
             setReceiveSuccess(true);
             setReceiveText("");
         }
@@ -1160,6 +1482,7 @@ function App() {
             return;
         e.preventDefault();
         var touch = e.touches[0];
+        setGhostPos({ x: touch.clientX, y: touch.clientY });
         var items = seatGridRef.current.querySelectorAll("[data-seat-key]");
         for (var i = 0; i < items.length; i++) {
             var rect = items[i].getBoundingClientRect();
@@ -1176,7 +1499,35 @@ function App() {
         touchSeatSrc.current = null;
         setDragSeatSrc(null);
         setDragSeatDst(null);
+        setQuickDragMode(false);
+        setGhostName("");
     }
+    function handleNameLongPressStart(e, ci, si, name) {
+        if (moveMode || colorEditMode) return;
+        var key = seatKey(ci, si);
+        var touch = e.touches[0];
+        longPressTimer.current = setTimeout(function() {
+            touchSeatSrc.current = key;
+            setDragSeatSrc(key);
+            setQuickDragMode(true);
+            setGhostName(name);
+            setGhostPos({ x: touch.clientX, y: touch.clientY });
+            if (navigator.vibrate) navigator.vibrate(40);
+        }, 450);
+    }
+    function handleNameLongPressCancel() {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    }
+    React.useEffect(function() {
+        function preventScroll(e) {
+            if (quickDragMode) e.preventDefault();
+        }
+        document.addEventListener("touchmove", preventScroll, { passive: false });
+        return function() { document.removeEventListener("touchmove", preventScroll); };
+    }, [quickDragMode]);
     var dayCopyList = useMemo(function () {
         var days = [];
         for (var mo = 0; mo < 3; mo++) {
@@ -1232,21 +1583,31 @@ function App() {
         toast && (React.createElement("div", { style: { position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)", background: "#1e3a5f", color: "white", padding: "10px 24px", borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 99999, boxShadow: "0 4px 12px rgba(0,0,0,.3)" } },
             "\u2713 ",
             toast)),
+        quickDragMode && ghostName && (React.createElement("div", { style: {
+            position: "fixed", left: ghostPos.x - 60, top: ghostPos.y - 18, zIndex: 99999,
+            background: "rgba(30,58,95,0.78)", color: "white",
+            padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: 700,
+            pointerEvents: "none", whiteSpace: "nowrap",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.3)", transform: "scale(1.08)",
+        } }, ghostName)),
         React.createElement("div", { style: { background: "linear-gradient(135deg,#1e3a5f,#2d6a9f)", color: "white", padding: "8px 10px", boxShadow: "0 4px 16px rgba(30,58,95,.4)" } },
-            React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 } },
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", marginRight: 20, paddingLeft: 10 } },
-                    React.createElement("span", { style: { fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" } }, "\u30C7\u30A4\u30B5\u30FC\u30D3\u30B9 \u9001\u8FCE\u8868"),
+            React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 } },
+                    React.createElement("span", { style: { fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" } }, "\u30C7\u30A4\u30B5\u30FC\u30D3\u30B9 \u9001\u8FCE\u8868"),
                     React.createElement("button", { onClick: handleSave, style: {
-                            padding: "4px 12px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, marginLeft: 25, whiteSpace: "nowrap",
+                            padding: "4px 10px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap", marginLeft: 6,
                             background: saveStatus === "ok" ? "#e8f5e9" : saveStatus === "err" ? "#fee2e2" : "rgba(255,255,255,.2)",
                             color: saveStatus === "ok" ? "#2e7d32" : saveStatus === "err" ? "#e53e3e" : "white",
-                        } }, saveStatus === "ok" ? "✓ 保存済" : saveStatus === "err" ? "✗ エラー" : "💾 保存")),
-                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3, background: "rgba(255,255,255,.1)", borderRadius: 20, padding: "3px 8px", marginRight: 10 } },
-                    React.createElement("button", { onClick: handleZoomDown, style: { background: "none", border: "none", color: "white", fontSize: 16, cursor: "pointer", padding: "0 2px", fontWeight: 700 } }, "\u2212"),
-                    React.createElement("span", { style: { fontSize: 10, color: "rgba(255,255,255,.8)", minWidth: 30, textAlign: "center" } },
-                        Math.round(zoom * 100),
-                        "%"),
-                    React.createElement("button", { onClick: handleZoomUp, style: { background: "none", border: "none", color: "white", fontSize: 16, cursor: "pointer", padding: "0 2px", fontWeight: 700 } }, "\uFF0B")))),
+                        } }, saveStatus === "ok" ? "✓ 保存済" : saveStatus === "err" ? "✗ エラー" : "💾 保存"),
+                    selectedDate && React.createElement("button", { onClick: handlePrint, style: {
+                            padding: "4px 10px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
+                            background: "rgba(255,255,255,.2)", color: "white",
+                        } }, "\uD83D\uDDA8 \u5370\u5237")),
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 2, background: "rgba(255,255,255,.1)", borderRadius: 20, padding: "3px 6px", flexShrink: 0 } },
+                    React.createElement("button", { onClick: handleZoomDown, style: { background: "none", border: "none", color: "white", fontSize: 15, cursor: "pointer", padding: "0 2px", fontWeight: 700 } }, "\u2212"),
+                    React.createElement("span", { style: { fontSize: 10, color: "rgba(255,255,255,.8)", minWidth: 28, textAlign: "center" } },
+                        Math.round(zoom * 100), "%"),
+                    React.createElement("button", { onClick: handleZoomUp, style: { background: "none", border: "none", color: "white", fontSize: 15, cursor: "pointer", padding: "0 2px", fontWeight: 700 } }, "\uFF0B")))),
         !selectedDate ? (React.createElement("div", { style: { padding: "10px 8px" } },
             React.createElement("div", { style: { background: "white", borderRadius: 10, padding: "8px 12px", marginBottom: 10, boxShadow: "0 2px 8px rgba(0,0,0,.06)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 } },
                 React.createElement("button", { onClick: navPrev, style: { background: "#f0f4f8", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 16, cursor: "pointer", fontWeight: 700 } }, "\u2039"),
@@ -1325,9 +1686,21 @@ function App() {
                                 color: "white",
                                 cursor: (!weekCopySource || weekCopyTargets.length === 0) ? "default" : "pointer",
                             } },
-                            "\u2713 ",
-                            weekCopyTargets.length,
-                            "\u9031\u9593\u306B\u30B3\u30D4\u30FC"))))),
+                            "\u30B3\u30D4\u30FC\u3059\u308B"))))),
+            showWeekTable && (React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 3000, display: "flex", flexDirection: "column" } },
+                React.createElement("div", { style: { background: "white", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" } },
+                    React.createElement("div", { style: { background: "linear-gradient(135deg,#1e3a5f,#2d6a9f)", color: "white", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 } },
+                        React.createElement("div", null,
+                            React.createElement("div", { style: { fontWeight: 800, fontSize: 15 } }, "\uD83D\uDCC5 1\u9031\u9593\u5206\u306E\u30C7\u30FC\u30BF"),
+                            selectedDate && (React.createElement("div", { style: { fontSize: 10, color: "rgba(255,255,255,.8)", marginTop: 2 } },
+                                (function() {
+                                    var mon = new Date(getMondayKey(new Date(selectedDate + "T00:00:00")) + "T00:00:00");
+                                    var fri = new Date(mon.getTime()); fri.setDate(fri.getDate() + 4);
+                                    return (mon.getMonth()+1) + "/" + mon.getDate() + "（月）〜" + (fri.getMonth()+1) + "/" + fri.getDate() + "（金）";
+                                })()))),
+                        React.createElement("button", { onClick: function() { setShowWeekTable(false); }, style: { background: "rgba(255,255,255,.2)", border: "none", color: "white", borderRadius: 20, padding: "4px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "✕ 閉じる")),
+                    React.createElement("div", { style: { flex: 1, overflowX: "hidden", overflowY: "auto" } },
+                        React.createElement(WeekTable, { allGrids: allGrids, setAllGrids: setAllGrids, selectedDate: selectedDate || toKey(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate()), carNames: carNames, drivers: drivers, driverList: driverList, absent: absent }))))),
             showDayCopy && (React.createElement("div", { style: modalOverlay },
                 React.createElement("div", { style: modalBox },
                     React.createElement("div", { style: modalTitle }, "\uD83D\uDCC6 1\u65E5\u5206\u3092\u30B3\u30D4\u30FC"),
@@ -1376,9 +1749,7 @@ function App() {
                                 color: "white",
                                 cursor: (!dayCopySource || dayCopyTargets.length === 0) ? "default" : "pointer",
                             } },
-                            "\u2713 ",
-                            dayCopyTargets.length,
-                            "\u65E5\u306B\u30B3\u30D4\u30FC"))))),
+                            "\u30B3\u30D4\u30FC\u3059\u308B"))))),
             showBulk && (React.createElement("div", { style: modalOverlay },
                 React.createElement("div", { style: { background: "white", borderRadius: 16, padding: 20, width: "100%", maxWidth: 340 } },
                     React.createElement("div", { style: modalTitle }, "\uD83D\uDCCB 1\u30F6\u6708\u5206 \u4E00\u62EC\u767B\u9332"),
@@ -1451,10 +1822,16 @@ function App() {
                     var g = allGrids[key];
                     var amSet = new Set(), pmSet = new Set();
                     if (g) {
-                        g.AM.forEach(function (car) { car.forEach(function (s) { if (s.name)
-                            amSet.add(s.name); }); });
-                        g.PM.forEach(function (car) { car.forEach(function (s) { if (s.name)
-                            pmSet.add(s.name); }); });
+                        g.AM.forEach(function (car) { car.forEach(function (s) {
+                            if (!s.name) return;
+                            var p = people.find(function(pp) { return pp.name === s.name; });
+                            if (!p || !p.periods || p.periods.length === 0 || p.periods.indexOf("AM") >= 0) amSet.add(s.name);
+                        }); });
+                        g.PM.forEach(function (car) { car.forEach(function (s) {
+                            if (!s.name) return;
+                            var p = people.find(function(pp) { return pp.name === s.name; });
+                            if (!p || !p.periods || p.periods.length === 0 || p.periods.indexOf("PM") >= 0) pmSet.add(s.name);
+                        }); });
                     }
                     var summary = (amSet.size || pmSet.size) ? { am: amSet.size, pm: pmSet.size } : null;
                     var isToday = d.toDateString() === today.toDateString();
@@ -1526,6 +1903,14 @@ function App() {
                                 } }, "\u270F\uFE0F \u7DE8\u96C6\u3059\u308B")));
                     })))),
             React.createElement("div", { style: { marginTop: 8 } },
+                calView === "week" && React.createElement("button", { onClick: function() { setShowWeekTable(true); }, style: {
+                    width: "100%", padding: "10px 14px", borderRadius: 10,
+                    border: "1.5px solid #7c3aed", background: "white",
+                    cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+                    display: "flex", alignItems: "center", gap: 8, marginBottom: 8,
+                } },
+                    React.createElement("span", { style: { fontSize: 15 } }, "\uD83D\uDCC5"),
+                    React.createElement("span", { style: { fontWeight: 700, color: "#7c3aed", fontSize: 13 } }, "1\u9031\u9593\u5206\u306E\u30C7\u30FC\u30BF")),
                 React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: showPeopleEdit ? 0 : 0 } },
                     React.createElement("button", { onClick: togglePeopleEdit, style: {
                             flex: 1, padding: "10px 14px",
@@ -1538,7 +1923,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 15 } }, "\uD83D\uDCCB"),
                             React.createElement("span", { style: { fontWeight: 700, color: "#1e3a5f", fontSize: 13 } }, "\u5229\u7528\u8005\u4E00\u89A7"),
                             React.createElement("span", { style: { fontSize: 11, background: "#e3f2fd", color: "#1565c0", borderRadius: 10, padding: "1px 8px", fontWeight: 600 } },
-                                people.length,
+                                selectedDate ? sortedPeople.length : people.length,
                                 "\u540D"),
                             Array.from(absent).length > 0 && (React.createElement("span", { style: { fontSize: 11, background: "#ffe4e6", color: "#e11d48", borderRadius: 10, padding: "1px 8px", fontWeight: 600 } },
                                 "\u4F11\u307F",
@@ -1597,6 +1982,13 @@ function App() {
                                         color: p.memo ? "#854d0e" : "#718096",
                                         cursor: "pointer", fontWeight: 700, flexShrink: 0,
                                     } }, "\uD83D\uDCDD"),
+                                React.createElement("button", { onClick: function () { toggleScheduleOpen(origIdx); }, style: {
+                                        background: ((p.days||[]).length > 0 || (p.periods||[]).length > 0) ? "#dbeafe" : "#f0f4f8",
+                                        border: "1px solid " + (((p.days||[]).length > 0 || (p.periods||[]).length > 0) ? "#93c5fd" : "#e0e7ef"),
+                                        borderRadius: 6, padding: "4px 7px", fontSize: 11,
+                                        color: ((p.days||[]).length > 0 || (p.periods||[]).length > 0) ? "#1e40af" : "#718096",
+                                        cursor: "pointer", fontWeight: 700, flexShrink: 0,
+                                    } }, "\uD83D\uDCC5"),
                                 React.createElement("button", { onClick: function () { toggleAbsent(p.name); }, style: {
                                         background: isAbsent ? "#e5e7eb" : "#fef3c7",
                                         border: "none", borderRadius: 6, padding: "4px 7px", fontSize: 11,
@@ -1604,7 +1996,35 @@ function App() {
                                         cursor: "pointer", fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap",
                                     } }, isAbsent ? "出席" : "休み"),
                                 React.createElement("button", { onClick: function () { removePerson(p.name); }, style: { background: "#fee2e2", border: "none", borderRadius: 6, padding: "4px 7px", fontSize: 11, color: "#e53e3e", cursor: "pointer", fontWeight: 700, flexShrink: 0 } }, "\u524A\u9664")),
-                            memoOpen === origIdx && (React.createElement("textarea", { value: p.memo, onChange: function (e) { setMemo(p.name, e.target.value); }, placeholder: "\u30E1\u30E2\u3092\u5165\u529B\u2026", style: { width: "100%", border: "1.5px solid #fde047", borderRadius: 6, padding: "6px 8px", fontSize: 12, outline: "none", resize: "none", minHeight: 60, background: "#fffef0", fontFamily: "inherit" } }))));
+                            memoOpen === origIdx && (React.createElement("textarea", { value: p.memo, onChange: function (e) { setMemo(p.name, e.target.value); }, placeholder: "\u30E1\u30E2\u3092\u5165\u529B\u2026", style: { width: "100%", border: "1.5px solid #fde047", borderRadius: 6, padding: "6px 8px", fontSize: 12, outline: "none", resize: "none", minHeight: 60, background: "#fffef0", fontFamily: "inherit" } })),
+                            scheduleOpen === origIdx && (React.createElement("div", { style: { background: "#eff6ff", border: "1.5px solid #93c5fd", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 } },
+                                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#1e40af", marginBottom: 2 } }, "\uD83D\uDCC5 利用曜日"),
+                                React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } },
+                                    DAY_LABELS.map(function(dl, di) {
+                                        var on = (p.days||[]).indexOf(di) >= 0;
+                                        return React.createElement("button", { key: di, onClick: function() { toggleScheduleDay(p.name, di); }, style: {
+                                            width: 32, height: 32, borderRadius: 8, border: "1.5px solid " + (on ? "#2563eb" : "#c7d2fe"),
+                                            background: on ? "#2563eb" : "white", color: on ? "white" : "#6366f1",
+                                            fontWeight: 700, fontSize: 12, cursor: "pointer", flexShrink: 0,
+                                        } }, dl);
+                                    })),
+                                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#1e40af" } }, "\u23F0 利用時間帯"),
+                                React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
+                                    PERIOD_LABELS.map(function(pl) {
+                                        var on = (p.periods||[]).indexOf(pl) >= 0;
+                                        return React.createElement("button", { key: pl, onClick: function() { toggleSchedulePeriod(p.name, pl); }, style: {
+                                            padding: "5px 12px", borderRadius: 20, border: "1.5px solid " + (on ? "#2563eb" : "#c7d2fe"),
+                                            background: on ? "#2563eb" : "white", color: on ? "white" : "#6366f1",
+                                            fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap",
+                                        } }, pl);
+                                    })),
+                                React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 2 } },
+                                    React.createElement("button", { onClick: function() { setScheduleOpen(null); }, style: {
+                                        padding: "6px 20px", borderRadius: 20, border: "none",
+                                        background: "#2563eb", color: "white",
+                                        fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                        boxShadow: "0 2px 8px rgba(37,99,235,.35)",
+                                    } }, "\u2713 決定"))))));
                     })),
                     React.createElement("div", { style: { display: "flex", gap: 6 } },
                         React.createElement("input", { placeholder: "\u65B0\u3057\u3044\u5229\u7528\u8005\u540D\u2026", value: newName, onChange: handleNewNameChange, onKeyDown: handleNewNameKeyDown, style: { flex: 1, border: "1.5px solid #c0ccda", borderRadius: 6, padding: "5px 9px", fontSize: 12, outline: "none" } }),
@@ -1720,6 +2140,48 @@ function App() {
                                         whiteSpace: "nowrap",
                                     } }, d));
                             })),
+                            React.createElement("button", { onClick: function() { setColorEditMode(function(v) { if(v) { setPaintColor(""); } return !v; }); }, style: {
+                                padding: "4px 10px", borderRadius: 50, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
+                                background: colorEditMode ? "#1e3a5f" : "#e2e8f0",
+                                color: colorEditMode ? "white" : "#718096",
+                            } }, colorEditMode ? "🎨 色編集ON" : "🎨 色編集"),
+                            colorEditMode && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } },
+                                [["", "#e2e8f0", "なし"], ["gray", "#64748b", "灰"], ["yellow", "#facc15", "黄"], ["cyan", "#0ea5e9", "水"], ["green", "#16a34a", "緑"]].map(function(item) {
+                                    var cv = item[0], cc = item[1], label = item[2];
+                                    var isSelected = paintColor === cv;
+                                    return React.createElement("div", { key: cv, onClick: function() { setPaintColor(cv); }, style: {
+                                        width: 30, height: 30, borderRadius: 6,
+                                        background: cv === "" ? "white" : cc,
+                                        border: isSelected ? "2.5px solid #1e3a5f" : "1.5px solid #b0bec5",
+                                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 9, fontWeight: 700, color: cv === "yellow" ? "#92400e" : cv === "" ? "#94a3b8" : "white",
+                                        boxShadow: isSelected ? "0 0 0 2px #2d6a9f55" : "none",
+                                        flexShrink: 0,
+                                    }}, label);
+                                })),
+                            // ── 印刷ドロップダウン ──
+                            React.createElement("div", { style: { position: "relative", marginLeft: "auto" } },
+                                React.createElement("button", { onClick: function() { setShowDayPrintMenu(function(v) { return !v; }); }, style: {
+                                    padding: "4px 12px", borderRadius: 50, border: "none", cursor: "pointer",
+                                    fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
+                                    background: "#e2e8f0", color: "#1e3a5f",
+                                } }, "🖨 印刷 ▾"),
+                                showDayPrintMenu && React.createElement("div", { style: {
+                                    position: "absolute", top: "calc(100% + 4px)", right: 0,
+                                    background: "white", border: "1.5px solid #e0e7ef", borderRadius: 10,
+                                    boxShadow: "0 4px 16px rgba(0,0,0,.12)", zIndex: 200,
+                                    overflow: "hidden", minWidth: 130,
+                                } },
+                                    React.createElement("button", { onClick: function() { handlePrintSection("AM"); setShowDayPrintMenu(false); }, style: {
+                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                        background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                                    } }, "🌅 AM 迎え"),
+                                    React.createElement("button", { onClick: function() { handlePrintSection("PM"); setShowDayPrintMenu(false); }, style: {
+                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                        background: "white", border: "none",
+                                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                                    } }, "🌇 PM 迎え"))),
                             dups.size > 0 && (React.createElement("div", { style: { background: "#fff3e0", border: "1.5px solid #ffb74d", borderRadius: 8, padding: "3px 8px", fontSize: 11, color: "#e65100", fontWeight: 600 } }, "\u26A0\uFE0F \u91CD\u8907")))),
                     dupDetails.length > 0 && (React.createElement("div", { style: { marginBottom: 8, background: "#fff3e0", border: "2px solid #ffb74d", borderRadius: 10, padding: "10px 14px" } },
                         React.createElement("div", { style: { fontWeight: 800, fontSize: 13, color: "#e65100", marginBottom: 6 } },
@@ -1732,7 +2194,7 @@ function App() {
                                 React.createElement("span", { style: { color: "#718096" } }, "→"),
                                 React.createElement("span", { style: { color: "#e65100", fontWeight: 600 } }, d.cars.join("・"))));
                         }))),
-                    React.createElement("div", { ref: seatGridRef, onTouchMove: moveMode ? handleSeatTouchMove : undefined, onTouchEnd: moveMode ? handleSeatTouchEnd : undefined, style: { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 } }, carNames.map(function (carName, ci) {
+                    React.createElement("div", { ref: seatGridRef, onTouchMove: (moveMode || quickDragMode) ? handleSeatTouchMove : undefined, onTouchEnd: (moveMode || quickDragMode) ? handleSeatTouchEnd : undefined, style: { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 } }, carNames.map(function (carName, ci) {
                         var seats = (allGrids[selectedDate] || mkDay())[period][ci];
                         var count = seats.filter(function (s) { return s.name; }).length;
                         var memoPass = seats
@@ -1773,12 +2235,16 @@ function App() {
                             React.createElement("div", { style: { background: "#1a3354", padding: "5px 10px", position: "relative" } },
                                 React.createElement("div", { onClick: function () { toggleDriverKey(ci); }, style: { display: "flex", alignItems: "center", gap: 4, cursor: "pointer" } },
                                     React.createElement("span", { style: { fontSize: 11, flexShrink: 0 } }, "\uD83E\uDDD1\u200D\u2708\uFE0F"),
-                                    React.createElement("span", { style: { fontSize: 11, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: drivers[ci] ? "#fff" : "rgba(255,255,255,.45)" } }, drivers[ci] || "未設定"),
+                                    (function() {
+                                        var dayDrv = (allGrids[selectedDate] && allGrids[selectedDate].drivers) ? allGrids[selectedDate].drivers[ci] : "";
+                                        return React.createElement("span", { style: { fontSize: 11, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: dayDrv ? "#fff" : "rgba(255,255,255,.45)" } }, dayDrv || "未設定");
+                                    })(),
                                     React.createElement("span", { style: { fontSize: 9, color: "rgba(255,255,255,.5)", flexShrink: 0 } }, "\u25BC")),
                                 openDriverKey === ci && (React.createElement("div", { style: { position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: "white", border: "2px solid #2d6a9f", borderRadius: 9, boxShadow: "0 8px 24px rgba(0,0,0,.15)", zIndex: 999, overflow: "hidden" } },
                                     React.createElement("div", { onClick: function () { handleDriverClear(ci); }, style: { padding: "7px 12px", cursor: "pointer", color: "#a0aec0", fontSize: 12, borderBottom: "1px solid #f0f4f8" } }, "\u2014 \u672A\u8A2D\u5B9A\u306B\u623B\u3059"),
                                     driverList.map(function (d, di) {
-                                        var isActive = d === drivers[ci];
+                                        var dayDrv2 = (allGrids[selectedDate] && allGrids[selectedDate].drivers) ? allGrids[selectedDate].drivers[ci] : "";
+                                        var isActive = d === dayDrv2;
                                         return (React.createElement("div", { key: di, onClick: function () { handleDriverSelect(ci, d); }, style: {
                                                 padding: "8px 12px", cursor: "pointer", fontSize: 13, display: "flex", justifyContent: "space-between",
                                                 fontWeight: isActive ? 700 : 400,
@@ -1789,37 +2255,42 @@ function App() {
                                             isActive && React.createElement("span", { style: { fontSize: 10, color: "#2d6a9f" } }, "\u2713")));
                                     })))),
                             React.createElement("div", { style: { padding: "5px 7px", display: "flex", flexDirection: "column", gap: 3 } }, seats.map(function (seat, si) {
-                                var name = seat.name, seatNo = seat.seatNo, time = seat.time;
+                                var name = seat.name, seatNo = seat.seatNo, time = seat.time, seatColor = seat.color || "";
+                                var colorBg = { "": null, "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
+                                var colorBorder = { "": null, "gray": "#334155", "yellow": "#a16207", "cyan": "#0369a1", "green": "#166534" };
                                 var skey = ci + "-" + si;
                                 var sk = seatKey(ci, si);
                                 var isOpen = !moveMode && openKey === skey;
                                 var isDup = name && dups.has(name);
                                 var isSrcDragging = dragSeatSrc === sk;
                                 var isDstOver = dragSeatDst === sk && dragSeatSrc !== sk;
-                                return (React.createElement("div", { key: si, "data-seat-key": sk, draggable: moveMode, onDragStart: moveMode ? function () { handleSeatDragStart(ci, si); } : undefined, onDragEnter: moveMode ? function () { handleSeatDragEnter(ci, si); } : undefined, onDragEnd: moveMode ? handleSeatDragEnd : undefined, onDragOver: moveMode ? function (e) { e.preventDefault(); } : undefined, onTouchStart: moveMode ? function (e) { handleSeatTouchStart(e, ci, si); } : undefined, style: { position: "relative", opacity: isSrcDragging ? 0.3 : 1, outline: isDstOver ? "2px solid #2d6a9f" : "none", borderRadius: 5 } },
-                                    React.createElement("div", { style: {
+                                var isQuickDragging = quickDragMode && isSrcDragging;
+                                var bg = colorBg[seatColor] || (isOpen ? "#e3f2fd" : isDup ? "#fff3e0" : name ? "#f1f8e9" : "#f8fafc");
+                                var bd = colorBorder[seatColor]
+                                    ? "1.5px solid " + colorBorder[seatColor]
+                                    : (isOpen ? "2px solid #2d6a9f" : isDup ? "1.5px solid #ffb74d" : name ? "1.5px solid #aed581" : "1.5px dashed #cdd5df");
+                                return (React.createElement("div", { key: si, "data-seat-key": sk, draggable: moveMode, onDragStart: moveMode ? function () { handleSeatDragStart(ci, si); } : undefined, onDragEnter: (moveMode || quickDragMode) ? function () { handleSeatDragEnter(ci, si); } : undefined, onDragEnd: moveMode ? handleSeatDragEnd : undefined, onDragOver: (moveMode || quickDragMode) ? function (e) { e.preventDefault(); } : undefined, style: { position: "relative", opacity: isSrcDragging ? 0.3 : 1, outline: isDstOver ? "2px solid #2d6a9f" : "none", borderRadius: 5 } },
+                                    React.createElement("div", { onClick: function(e) { if (!moveMode && colorEditMode) { e.stopPropagation(); setSeatColor(ci, si, paintColor); return; } }, style: {
                                             display: "flex", alignItems: "center", gap: 4, padding: "4px 6px", borderRadius: 5,
-                                            cursor: moveMode ? "grab" : "default",
-                                            background: moveMode
-                                                ? (name ? "#e8f4fd" : "#f8fafc")
-                                                : (isOpen ? "#e3f2fd" : isDup ? "#fff3e0" : name ? "#f1f8e9" : "#f8fafc"),
-                                            border: moveMode
-                                                ? "1.5px solid " + (name ? "#90caf9" : "#cdd5df")
-                                                : (isOpen ? "2px solid #2d6a9f" : isDup ? "1.5px solid #ffb74d" : name ? "1.5px solid #aed581" : "1.5px dashed #cdd5df"),
+                                            cursor: (!moveMode && colorEditMode) ? "crosshair" : (moveMode || isQuickDragging) ? "grab" : "default",
+                                            background: (moveMode || isQuickDragging) ? (name ? "#e8f4fd" : "#f8fafc") : bg,
+                                            border: (moveMode || isQuickDragging) ? "1.5px solid " + (name ? "#90caf9" : "#cdd5df") : bd,
                                         } },
-                                        moveMode && (React.createElement("span", { style: { fontSize: 14, color: "#90caf9", flexShrink: 0 } }, "\u283F")),
-                                        React.createElement("div", { onClick: function () {
-                                                if (moveMode)
-                                                    return;
+                                        (moveMode || quickDragMode) && name && (React.createElement("span", { style: { fontSize: 14, color: "#90caf9", flexShrink: 0 } }, "\u283F")),
+                                        React.createElement("div", { onTouchStart: name && !moveMode && !colorEditMode ? function(e) { handleNameLongPressStart(e, ci, si, name); } : undefined, onTouchEnd: handleNameLongPressCancel, onTouchMove: quickDragMode ? undefined : handleNameLongPressCancel,
+                                            onClick: function () {
+                                                if (moveMode) return;
+                                                if (colorEditMode) return;
+                                                if (quickDragMode) return;
                                                 setOpenKey(isOpen ? null : skey);
                                                 setSearch("");
-                                            }, style: { display: "flex", alignItems: "center", flex: 1, cursor: moveMode ? "grab" : "pointer", userSelect: "none", minWidth: 0 } },
+                                            }, style: { display: "flex", alignItems: "center", flex: 1, cursor: (!moveMode && colorEditMode) ? "crosshair" : (moveMode ? "grab" : "pointer"), userSelect: "none", minWidth: 0, WebkitUserSelect: "none" } },
                                             React.createElement("span", { style: { flex: 1, fontSize: 11, fontWeight: name ? 600 : 400, color: name ? (isDup ? "#e65100" : "#1e3a5f") : "#a0aec0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name || "未配置")),
                                         name && !moveMode && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flexShrink: 0 } },
                                             React.createElement("div", { onClick: handleTimeClick, style: { position: "relative", flexShrink: 0 } },
                                                 React.createElement("select", { value: time, onChange: function (e) { handleTimeChange(ci, si, e); }, onClick: handleTimeClick, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 11 } },
                                                     React.createElement("option", { value: "" }, "--:--"),
-                                                    TIME_OPTIONS.map(function (t) { return React.createElement("option", { key: t, value: t }, t); })),
+                                                    (period === "AM" ? TIME_OPTIONS_AM : TIME_OPTIONS_PM).map(function (t) { return React.createElement("option", { key: t, value: t }, t); })),
                                                 React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: time ? "#1e3a5f" : "#c0ccda", letterSpacing: "0.03em", minWidth: 46, textAlign: "center", pointerEvents: "none" } }, time || "--:--")),
                                             React.createElement("select", { value: seatNo, onChange: function (e) { handleSeatNoChange(ci, si, e); }, onClick: handleSeatNoClick, style: { fontSize: 11, fontWeight: 700, border: "1px solid #c0ccda", borderRadius: 4, padding: "1px 2px", background: "white", color: seatNo ? "#1e3a5f" : "#a0aec0", outline: "none", cursor: "pointer", width: 36, textAlign: "center" } },
                                                 React.createElement("option", { value: "" }, "-"),
@@ -1833,9 +2304,7 @@ function App() {
                                             filtered.map(function (p, pi) {
                                                 var taken = assigned.has(p.name) && p.name !== name;
                                                 return (React.createElement("div", { key: pi, onClick: function () {
-                                                        if (taken)
-                                                            return;
-                                                        if (assigned.has(p.name) && p.name !== name) {
+                                                        if (taken) {
                                                             setDupConfirm({ ci: ci, si: si, pname: p.name });
                                                             return;
                                                         }
