@@ -454,6 +454,172 @@ function WeekTable(props) {
             )))
         );
 }
+function PeopleListPage(props) {
+    var people = props.people, absent = props.absent, usageCount = props.usageCount;
+    var dragIdx = props.dragIdx, dragOverIdx = props.dragOverIdx;
+    var onClose = props.onClose, onOpenDetail = props.onOpenDetail;
+    var onDragStart = props.onDragStart, onDragEnter = props.onDragEnter, onDragEnd = props.onDragEnd;
+    var onTouchStartDrag = props.onTouchStartDrag, onTouchMoveDrag = props.onTouchMoveDrag, onTouchEndDrag = props.onTouchEndDrag;
+    var peopleListRef = props.peopleListRef;
+    var onAddPerson = props.onAddPerson, setNewName = props.setNewName;
+    var [localInput, setLocalInput] = React.useState("");
+    var [sortMode, setSortMode] = React.useState("added");
+    var [reordering, setReordering] = React.useState(false);
+    function handleLocalChange(e){ setLocalInput(e.target.value); setNewName(e.target.value); }
+    function handleLocalKeyDown(e){
+        if(e.key==="Enter" && localInput.trim()){ onAddPerson(); setLocalInput(""); }
+    }
+    function handleLocalAdd(){ if(localInput.trim()){ onAddPerson(); setLocalInput(""); } }
+
+    var sortedPeople = people.slice();
+    if(sortMode === "name") {
+        sortedPeople.sort(function(a,b){ return a.name.localeCompare(b.name, "ja"); });
+    } else if(sortMode === "usage") {
+        sortedPeople.sort(function(a,b){ return (usageCount[b.name]||0) - (usageCount[a.name]||0); });
+    }
+
+    var sortBtns = [["added","\u8ffd\u52a0\u9806"],["name","\u540d\u524d\u9806"],["usage","\u5229\u7528\u56de\u6570\u9806"]];
+
+    return React.createElement("div", { style: { position:"fixed", inset:0, zIndex:7000, background:"#f0f4f8", display:"flex", flexDirection:"column" } },
+        React.createElement("div", { style: { background:"linear-gradient(135deg,#1e3a5f,#2d6a9f)", color:"white", padding:"10px 14px", display:"flex", alignItems:"center", gap:10, flexShrink:0 } },
+            React.createElement("button", { onClick: onClose, style:{ background:"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"6px 14px", fontSize:12, cursor:"pointer", fontWeight:700 } }, "\u2190 \u623b\u308b"),
+            React.createElement("div", { style:{ fontWeight:800, fontSize:14, flex:1 } }, "\uD83D\uDCCB \u5229\u7528\u8005\u4e00\u89a7"),
+            React.createElement("span", { style:{ fontSize:11, background:"rgba(255,255,255,.2)", borderRadius:10, padding:"2px 8px", fontWeight:700 } }, people.length + "\u540d")),
+        React.createElement("div", { style:{ padding:"6px 10px 4px", background:"white", borderBottom:"1px solid #e0e7ef", display:"flex", gap:5, flexShrink:0 } },
+            sortBtns.map(function(item){
+                var v = item[0], lbl = item[1];
+                var active = sortMode === v && !reordering;
+                return React.createElement("button", { key:v, onClick: function(){ setSortMode(v); setReordering(false); }, style:{
+                    flex:1, padding:"5px 0", borderRadius:7, fontSize:11, cursor:"pointer", fontWeight: active?700:400,
+                    border: "1.5px solid " + (active?"#2d6a9f":"#e0e7ef"),
+                    background: active?"#e3f2fd":"white",
+                    color: active?"#1565c0":"#718096",
+                } }, lbl);
+            }),
+            React.createElement("button", { onClick: function(){ setReordering(function(r){ return !r; }); setSortMode("added"); }, style:{
+                padding:"5px 10px", borderRadius:7, fontSize:11, cursor:"pointer", fontWeight: reordering?700:400,
+                border: "1.5px solid " + (reordering?"#f59e0b":"#e0e7ef"),
+                background: reordering?"#fef9c3":"white",
+                color: reordering?"#92400e":"#718096",
+                flexShrink:0,
+            } }, reordering ? "\u2713 \u5b8c\u4e86" : "\u26f4 \u4e26\u3073\u66ff\u3048")),
+        reordering && React.createElement("div", { style:{ fontSize:9, color:"#92400e", textAlign:"center", padding:"3px 0", background:"#fef9c3", borderBottom:"1px solid #fde68a", flexShrink:0 } }, "\u283f \u5de6\u306e\u30cf\u30f3\u30c9\u30eb\u3092\u30c9\u30e9\u30c3\u30b0\u3057\u3066\u4e26\u3073\u66ff\u3048"),
+        React.createElement("div", { ref: peopleListRef, onTouchMove: function(e){ if(reordering) onTouchMoveDrag(e, peopleListRef); }, onTouchEnd: function(e){ if(reordering) onTouchEndDrag(e); }, style:{ flex:1, overflowY:"auto", padding:"6px 10px" } },
+            React.createElement("div", { style:{ display:"flex", flexDirection:"column", gap:3 } }, sortedPeople.map(function(p){
+                var origIdx = people.indexOf(p);
+                var isAbsent = absent.has(p.name);
+                var isDragging = dragIdx === origIdx;
+                var isOver = dragOverIdx === origIdx && dragIdx !== origIdx;
+                var pdays = (p.days||[]).slice().sort().map(function(di){ return ["\u6708","\u706b","\u6c34","\u6728","\u91d1"][di]; }).join("\u30fb");
+                var pperiods = (p.periods||[]).join("\u30fb");
+                var hasSchedule = pdays || pperiods;
+                return React.createElement("div", { key: p.name, "data-person-idx": origIdx,
+                    draggable: reordering,
+                    onDragStart: function(){ if(reordering) onDragStart(origIdx); },
+                    onDragEnter: function(){ if(reordering) onDragEnter(origIdx); },
+                    onDragEnd: function(){ if(reordering) onDragEnd(); },
+                    onDragOver: function(e){ e.preventDefault(); },
+                    style:{
+                        display:"flex", alignItems:"center", gap:7, padding:"5px 8px", borderRadius:8,
+                        background: isAbsent ? "#fff1f2" : "white",
+                        border: "1px solid " + (isOver ? "#f59e0b" : isAbsent ? "#fda4af" : "#e0e7ef"),
+                        opacity: isDragging ? 0.4 : 1,
+                        boxShadow: "0 1px 2px rgba(0,0,0,.04)",
+                    } },
+                    reordering
+                        ? React.createElement("div", { onTouchStart: function(e){ onTouchStartDrag(e, origIdx); }, style:{ fontSize:16, color:"#f59e0b", cursor:"grab", flexShrink:0, userSelect:"none", lineHeight:1, padding:"0 2px" } }, "\u283f")
+                        : React.createElement("div", { style:{ width:18, flexShrink:0 } }),
+                    React.createElement("div", { onClick: function(){ if(!reordering) onOpenDetail(origIdx); }, style:{ flex:1, minWidth:0, cursor: reordering?"default":"pointer" } },
+                        React.createElement("div", { style:{ fontSize:12, fontWeight:700, color: isAbsent?"#e11d48":"#1e3a5f", textDecoration: isAbsent?"line-through":"none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" } },
+                            p.name),
+                        React.createElement("div", { style:{ display:"flex", gap:4, marginTop:1, flexWrap:"wrap", alignItems:"center" } },
+                            hasSchedule
+                                ? [
+                                    pdays && React.createElement("span", { key:"d", style:{ fontSize:9, background:"#eff6ff", color:"#1e40af", borderRadius:4, padding:"1px 5px", fontWeight:600 } }, pdays),
+                                    pperiods && React.createElement("span", { key:"p", style:{ fontSize:9, background:(pperiods==="AM"?"#fef9c3":pperiods==="PM"?"#fce7f3":"#f0fdf4"), color:(pperiods==="AM"?"#92400e":pperiods==="PM"?"#9d174d":"#166534"), borderRadius:4, padding:"1px 5px", fontWeight:600 } }, pperiods),
+                                    React.createElement("span", { key:"u", style:{ fontSize:9, color:"#94a3b8" } }, (usageCount[p.name]||0)+"\u56de"),
+                                  ]
+                                : React.createElement("span", { style:{ fontSize:9, color:"#f59e0b", fontWeight:600 } }, "\u26a0\ufe0f \u672a\u8a2d\u5b9a")),
+                        p.memo && React.createElement("div", { style:{ fontSize:9, color:"#94a3b8", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" } }, "\uD83D\uDCDD " + p.memo)),
+                    !reordering && React.createElement("div", { style:{ display:"flex", gap:3, alignItems:"center", flexShrink:0 } },
+                        isAbsent && React.createElement("span", { style:{ fontSize:9, background:"#fee2e2", color:"#dc2626", borderRadius:3, padding:"1px 5px", fontWeight:700 } }, "\u4f11\u307f"),
+                        React.createElement("span", { onClick: function(){ onOpenDetail(origIdx); }, style:{ color:"#c0ccda", fontSize:16, lineHeight:1, cursor:"pointer" } }, "\u203a")));
+            }))),
+        React.createElement("div", { style:{ padding:"8px 10px 16px", background:"white", borderTop:"1px solid #e0e7ef", flexShrink:0 } },
+            React.createElement("div", { style:{ display:"flex", gap:6 } },
+                React.createElement("input", { placeholder:"\u65b0\u3057\u3044\u5229\u7528\u8005\u540d\u2026", value: localInput, onChange: handleLocalChange, onKeyDown: handleLocalKeyDown, style:{ flex:1, border:"1.5px solid #c0ccda", borderRadius:8, padding:"8px 10px", fontSize:13, outline:"none", fontFamily:"inherit" } }),
+                React.createElement("button", { onClick: handleLocalAdd, style:{ background:"#2d6a9f", color:"white", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:700, cursor:"pointer" } }, "\u8ffd\u52a0"))));
+}
+
+function PersonDetailPage(props) {
+    var person = props.person, absent = props.absent;
+    var onClose = props.onClose, onRename = props.onRename, onSetMemo = props.onSetMemo;
+    var onToggleAbsent = props.onToggleAbsent, onToggleDay = props.onToggleDay;
+    var onTogglePeriod = props.onTogglePeriod, onRemove = props.onRemove;
+    var [editName, setEditName] = React.useState(person.name);
+    var [confirmDelete, setConfirmDelete] = React.useState(false);
+    var isAbsent = absent.has(person.name);
+    var days = person.days || [];
+    var periods = person.periods || [];
+    var DAY_JP2 = ["\u6708","\u706b","\u6c34","\u6728","\u91d1"];
+    function handleClose() {
+        var t = editName.trim();
+        if (t && t !== person.name) onRename(person.name, t);
+        onClose();
+    }
+    function handleDelete() {
+        onRemove(person.name);
+        onClose();
+    }
+    return React.createElement("div", { style: { position:"fixed", inset:0, zIndex:8000, background:"#f0f4f8", display:"flex", flexDirection:"column", overflowY:"auto" } },
+        confirmDelete && React.createElement("div", { style:{ position:"fixed", inset:0, zIndex:9000, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" } },
+            React.createElement("div", { style:{ background:"white", borderRadius:16, padding:"24px 20px", width:"100%", maxWidth:320, textAlign:"center" } },
+                React.createElement("div", { style:{ fontSize:32, marginBottom:8 } }, "\uD83D\uDDD1\uFE0F"),
+                React.createElement("div", { style:{ fontWeight:800, fontSize:16, color:"#1e3a5f", marginBottom:8 } }, person.name + " \u3092\u524a\u9664"),
+                React.createElement("div", { style:{ fontSize:13, color:"#718096", marginBottom:20 } }, "\u9001\u8fcf\u8868\u304b\u3089\u3082\u524a\u9664\u3055\u308c\u307e\u3059\u3002\n\u3053\u306e\u64cd\u4f5c\u306f\u5143\u306b\u623b\u305b\u307e\u305b\u3093\u3002"),
+                React.createElement("div", { style:{ display:"flex", gap:10 } },
+                    React.createElement("button", { onClick: function(){ setConfirmDelete(false); }, style:{ flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #e0e7ef", background:"white", color:"#718096", fontSize:14, fontWeight:700, cursor:"pointer" } }, "\u30ad\u30e3\u30f3\u30bb\u30eb"),
+                    React.createElement("button", { onClick: handleDelete, style:{ flex:1, padding:"12px", borderRadius:10, border:"none", background:"#dc2626", color:"white", fontSize:14, fontWeight:700, cursor:"pointer" } }, "\u524a\u9664\u3059\u308b")))),
+        React.createElement("div", { style: { background:"linear-gradient(135deg,#1e3a5f,#2d6a9f)", color:"white", padding:"12px 14px", display:"flex", alignItems:"center", gap:10, flexShrink:0 } },
+            React.createElement("button", { onClick:handleClose, style:{ background:"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"8px 16px", fontSize:13, cursor:"pointer", fontWeight:700 } }, "\u2190 \u623b\u308b"),
+            React.createElement("div", { style:{ fontWeight:800, fontSize:16, flex:1 } }, "\uD83D\uDC64 \u5229\u7528\u8005\u8a73\u7d30")),
+        React.createElement("div", { style:{ padding:14, display:"flex", flexDirection:"column", gap:10 } },
+            React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
+                React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u6c0f\u540d"),
+                React.createElement("input", { value:editName, onChange:function(e){setEditName(e.target.value);}, style:{ width:"100%", border:"1.5px solid #c0ccda", borderRadius:8, padding:"10px 12px", fontSize:17, fontWeight:700, color:"#1e3a5f", outline:"none", fontFamily:"inherit", boxSizing:"border-box" } })),
+            React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
+                React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u5229\u7528\u66dc\u65e5"),
+                React.createElement("div", { style:{ display:"flex", gap:6 } }, DAY_JP2.map(function(lbl,di){
+                    var active = days.indexOf(di)>=0;
+                    return React.createElement("button", { key:di, onClick:function(){onToggleDay(person.name,di);}, style:{
+                        flex:1, padding:"12px 4px", borderRadius:10, fontSize:15, fontWeight:800, cursor:"pointer",
+                        border: active?"none":"1.5px solid #e0e7ef",
+                        background: active?"#1e3a5f":"#f8fafc", color: active?"white":"#c0ccda",
+                    } }, lbl);
+                }))),
+            React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
+                React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u5229\u7528\u6642\u9593\u5e2f"),
+                React.createElement("div", { style:{ display:"flex", gap:10 } }, ["AM","PM"].map(function(pp2){
+                    var active = periods.indexOf(pp2)>=0;
+                    return React.createElement("button", { key:pp2, onClick:function(){onTogglePeriod(person.name,pp2);}, style:{
+                        flex:1, padding:"14px", borderRadius:10, fontSize:16, fontWeight:800, cursor:"pointer", border:"none",
+                        background: active?(pp2==="AM"?"#f6c90e":"#ff7043"):"#f0f4f8",
+                        color: active?(pp2==="AM"?"#1e3a5f":"white"):"#c0ccda",
+                    } }, pp2);
+                }))),
+            React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
+                React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u51fa\u5e2d\u72b6\u6cc1\uff08\u672c\u65e5\uff09"),
+                React.createElement("button", { onClick:function(){onToggleAbsent(person.name);}, style:{
+                    width:"100%", padding:"14px", borderRadius:10, fontSize:14, fontWeight:800, cursor:"pointer", border:"none",
+                    background: isAbsent?"#fee2e2":"#dcfce7", color: isAbsent?"#dc2626":"#16a34a",
+                } }, isAbsent?"\uD83D\uDCA4 \u672c\u65e5\u4f11\u307f\u3000\u2192\u3000\u51fa\u5e2d\u306b\u5909\u66f4":"\u2713 \u51fa\u5e2d\u4e2d\u3000\u2192\u3000\u4f11\u307f\u306b\u5909\u66f4")),
+            React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
+                React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\uD83D\uDCDD \u30e1\u30e2"),
+                React.createElement("textarea", { value:person.memo||"", onChange:function(e){onSetMemo(person.name,e.target.value);}, placeholder:"\u30e1\u30e2\u3092\u5165\u529b\u2026", style:{ width:"100%", border:"1.5px solid #e0e7ef", borderRadius:8, padding:"10px 12px", fontSize:13, outline:"none", resize:"none", minHeight:110, fontFamily:"inherit", boxSizing:"border-box", lineHeight:1.6 } })),
+            React.createElement("button", { onClick:handleClose, style:{ padding:"15px", borderRadius:12, border:"none", background:"#1e3a5f", color:"white", fontSize:15, fontWeight:800, cursor:"pointer", boxShadow:"0 4px 12px rgba(30,58,95,.3)" } }, "\u2713 \u4fdd\u5b58\u3057\u3066\u623b\u308b"),
+            React.createElement("button", { onClick:function(){ setConfirmDelete(true); }, style:{ padding:"13px", borderRadius:12, border:"1.5px solid #fca5a5", background:"white", color:"#dc2626", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 } }, "\uD83D\uDDD1\uFE0F \u3053\u306e\u5229\u7528\u8005\u3092\u524a\u9664")));
+}
+
 function App() {
     var today = new Date();
     // ── localStorage から前回のデータを復元 ─────────────────────────────
@@ -547,6 +713,8 @@ function App() {
     var [newName, setNewName] = useState("");
     var [memoOpen, setMemoOpen] = useState(null);
     var [scheduleOpen, setScheduleOpen] = useState(null);
+    var [personDetailPage, setPersonDetailPage] = useState(null);
+    var [showPeopleListPage, setShowPeopleListPage] = useState(false);
     var [openMemoCar, setOpenMemoCar] = useState(null);
     var [calView, setCalView] = useState("month");
     var [viewDate, setViewDate] = useState(new Date(today.getTime()));
@@ -1580,6 +1748,36 @@ function App() {
         })));
     }
     return (React.createElement("div", { style: { fontFamily: "sans-serif", minHeight: "100vh", background: "#f0f4f8" } },
+        personDetailPage !== null && people[personDetailPage] && React.createElement(PersonDetailPage, {
+            person: people[personDetailPage],
+            absent: absent,
+            onClose: function(){ setPersonDetailPage(null); },
+            onRename: renamePerson,
+            onSetMemo: setMemo,
+            onToggleAbsent: toggleAbsent,
+            onToggleDay: toggleScheduleDay,
+            onTogglePeriod: toggleSchedulePeriod,
+            onRemove: removePerson,
+        }),
+        showPeopleListPage && React.createElement(PeopleListPage, {
+            people: people,
+            absent: absent,
+            usageCount: usageCount,
+            dragIdx: dragIdx,
+            dragOverIdx: dragOverIdx,
+            peopleListRef: peopleListRef,
+            newName: newName,
+            setNewName: setNewName,
+            onClose: function(){ setShowPeopleListPage(false); },
+            onOpenDetail: function(idx){ setPersonDetailPage(idx); },
+            onDragStart: handleDragStart,
+            onDragEnter: handleDragEnter,
+            onDragEnd: handleDragEnd,
+            onTouchStartDrag: handleTouchStartDrag,
+            onTouchMoveDrag: handleTouchMoveDrag,
+            onTouchEndDrag: handleTouchEndDrag,
+            onAddPerson: handleAddPerson,
+        }),
         toast && (React.createElement("div", { style: { position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)", background: "#1e3a5f", color: "white", padding: "10px 24px", borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 99999, boxShadow: "0 4px 12px rgba(0,0,0,.3)" } },
             "\u2713 ",
             toast)),
@@ -1911,25 +2109,21 @@ function App() {
                 } },
                     React.createElement("span", { style: { fontSize: 15 } }, "\uD83D\uDCC5"),
                     React.createElement("span", { style: { fontWeight: 700, color: "#7c3aed", fontSize: 13 } }, "1\u9031\u9593\u5206\u306E\u30C7\u30FC\u30BF")),
-                React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: showPeopleEdit ? 0 : 0 } },
-                    React.createElement("button", { onClick: togglePeopleEdit, style: {
-                            flex: 1, padding: "10px 14px",
-                            borderRadius: showPeopleEdit ? "10px 10px 0 0" : 10,
+                React.createElement("div", { style: { display: "flex", gap: 8 } },
+                    React.createElement("button", { onClick: function(){ setShowPeopleListPage(true); }, style: {
+                            flex: 1, padding: "10px 14px", borderRadius: 10,
                             border: "1.5px solid #e0e7ef", background: "white",
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.06)",
                         } },
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                             React.createElement("span", { style: { fontSize: 15 } }, "\uD83D\uDCCB"),
-                            React.createElement("span", { style: { fontWeight: 700, color: "#1e3a5f", fontSize: 13 } }, "\u5229\u7528\u8005\u4E00\u89A7"),
+                            React.createElement("span", { style: { fontWeight: 700, color: "#1e3a5f", fontSize: 13 } }, "\u5229\u7528\u8005\u4e00\u89a7"),
                             React.createElement("span", { style: { fontSize: 11, background: "#e3f2fd", color: "#1565c0", borderRadius: 10, padding: "1px 8px", fontWeight: 600 } },
-                                selectedDate ? sortedPeople.length : people.length,
-                                "\u540D"),
+                                people.length, "\u540d"),
                             Array.from(absent).length > 0 && (React.createElement("span", { style: { fontSize: 11, background: "#ffe4e6", color: "#e11d48", borderRadius: 10, padding: "1px 8px", fontWeight: 600 } },
-                                "\u4F11\u307F",
-                                Array.from(absent).length,
-                                "\u540D"))),
-                        React.createElement("span", { style: { color: "#a0aec0", fontSize: 13 } }, showPeopleEdit ? "▲" : "▼")),
+                                "\u4f11\u307f", Array.from(absent).length, "\u540d"))),
+                        React.createElement("span", { style: { color: "#a0aec0", fontSize: 14 } }, "\u203a")),
                     React.createElement("button", { onClick: function () { setShowDataMenu(true); }, style: {
                             padding: "10px 14px", borderRadius: 10,
                             border: "1.5px solid #e0e7ef", background: "white",
@@ -1937,98 +2131,7 @@ function App() {
                             display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
                         } },
                         React.createElement("span", { style: { fontSize: 15 } }, "\uD83D\uDCE4"),
-                        React.createElement("span", { style: { fontWeight: 700, color: "#1e3a5f", fontSize: 13 } }, "\u30C7\u30FC\u30BF"))),
-                showPeopleEdit && (React.createElement("div", { style: { background: "white", borderRadius: "0 0 10px 10px", padding: "12px 14px", border: "1.5px solid #e0e7ef", borderTop: "none" } },
-                    React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10 } }, [["added", "追加順"], ["name", "名前順"], ["usage", "利用回数順"]].map(function (item) {
-                        var v = item[0], lbl = item[1];
-                        return (React.createElement("button", { key: v, onClick: function () { setPeopleSort(v); }, style: {
-                                flex: 1, padding: "4px 0", borderRadius: 8, fontSize: 11, cursor: "pointer",
-                                border: "1.5px solid " + (peopleSort === v ? "#2d6a9f" : "#e0e7ef"),
-                                background: peopleSort === v ? "#e3f2fd" : "white",
-                                color: peopleSort === v ? "#2d6a9f" : "#718096",
-                                fontWeight: peopleSort === v ? 700 : 400,
-                            } }, lbl));
-                    })),
-                    peopleSort === "added" && (React.createElement("div", { style: { fontSize: 10, color: "#a0aec0", marginBottom: 6, textAlign: "center" } }, "\u283F \u5DE6\u7AEF\u3092\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u4E26\u3079\u66FF\u3048")),
-                    React.createElement("div", { ref: peopleListRef, onTouchMove: function (e) { handleTouchMoveDrag(e, peopleListRef); }, onTouchEnd: handleTouchEndDrag, style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto", marginBottom: 7 } }, sortedPeople.map(function (p) {
-                        var origIdx = people.indexOf(p);
-                        var isAbsent = absent.has(p.name);
-                        var isDragging = dragIdx === origIdx;
-                        var isOver = dragOverIdx === origIdx && dragIdx !== origIdx;
-                        return (React.createElement("div", { key: p.name, "data-person-idx": origIdx, draggable: peopleSort === "added", onDragStart: function () { handleDragStart(origIdx); }, onDragEnter: function () { handleDragEnter(origIdx); }, onDragEnd: handleDragEnd, onDragOver: function (e) { e.preventDefault(); }, style: {
-                                display: "flex", flexDirection: "column", gap: 3,
-                                opacity: isDragging ? 0.4 : 1,
-                                borderTop: isOver ? "2px solid #2d6a9f" : "2px solid transparent",
-                                transition: "border-color 0.15s",
-                            } },
-                            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } },
-                                peopleSort === "added" && (React.createElement("div", { onTouchStart: function (e) { handleTouchStartDrag(e, origIdx); }, style: { fontSize: 18, color: "#94a3b8", cursor: "grab", padding: "0 4px", flexShrink: 0, userSelect: "none", lineHeight: 1 } }, "\u283F")),
-                                editingPerson === origIdx ? (React.createElement("input", { autoFocus: true, value: editingVal, onChange: handleEditingValChange, onBlur: function () { handleRenameBlur(p.name); }, onKeyDown: function (e) { handleRenameKeyDown(e, p.name); }, style: { flex: 1, border: "1.5px solid #2d6a9f", borderRadius: 6, padding: "4px 8px", fontSize: 12, outline: "none" } })) : (React.createElement("div", { onClick: function () { setEditingPerson(origIdx); setEditingVal(p.name); }, style: {
-                                        flex: 1, fontSize: 12, padding: "4px 8px", borderRadius: 6, cursor: "pointer",
-                                        background: isAbsent ? "#ffe4e6" : "white",
-                                        border: "1px solid " + (isAbsent ? "#fda4af" : "#e0e7ef"),
-                                        color: isAbsent ? "#e11d48" : "#1e3a5f",
-                                        textDecoration: isAbsent ? "line-through" : "none",
-                                    } },
-                                    p.name,
-                                    peopleSort === "usage" && (React.createElement("span", { style: { marginLeft: 6, fontSize: 10, color: "#94a3b8" } },
-                                        "(",
-                                        usageCount[p.name] || 0,
-                                        "\u56DE)")))),
-                                React.createElement("button", { onClick: function () { toggleMemoOpen(origIdx); }, style: {
-                                        background: p.memo ? "#fef9c3" : "#f0f4f8",
-                                        border: "1px solid " + (p.memo ? "#fde047" : "#e0e7ef"),
-                                        borderRadius: 6, padding: "4px 7px", fontSize: 11,
-                                        color: p.memo ? "#854d0e" : "#718096",
-                                        cursor: "pointer", fontWeight: 700, flexShrink: 0,
-                                    } }, "\uD83D\uDCDD"),
-                                React.createElement("button", { onClick: function () { toggleScheduleOpen(origIdx); }, style: {
-                                        background: ((p.days||[]).length > 0 || (p.periods||[]).length > 0) ? "#dbeafe" : "#f0f4f8",
-                                        border: "1px solid " + (((p.days||[]).length > 0 || (p.periods||[]).length > 0) ? "#93c5fd" : "#e0e7ef"),
-                                        borderRadius: 6, padding: "4px 7px", fontSize: 11,
-                                        color: ((p.days||[]).length > 0 || (p.periods||[]).length > 0) ? "#1e40af" : "#718096",
-                                        cursor: "pointer", fontWeight: 700, flexShrink: 0,
-                                    } }, "\uD83D\uDCC5"),
-                                React.createElement("button", { onClick: function () { toggleAbsent(p.name); }, style: {
-                                        background: isAbsent ? "#e5e7eb" : "#fef3c7",
-                                        border: "none", borderRadius: 6, padding: "4px 7px", fontSize: 11,
-                                        color: isAbsent ? "#6b7280" : "#92400e",
-                                        cursor: "pointer", fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap",
-                                    } }, isAbsent ? "出席" : "休み"),
-                                React.createElement("button", { onClick: function () { removePerson(p.name); }, style: { background: "#fee2e2", border: "none", borderRadius: 6, padding: "4px 7px", fontSize: 11, color: "#e53e3e", cursor: "pointer", fontWeight: 700, flexShrink: 0 } }, "\u524A\u9664")),
-                            memoOpen === origIdx && (React.createElement("textarea", { value: p.memo, onChange: function (e) { setMemo(p.name, e.target.value); }, placeholder: "\u30E1\u30E2\u3092\u5165\u529B\u2026", style: { width: "100%", border: "1.5px solid #fde047", borderRadius: 6, padding: "6px 8px", fontSize: 12, outline: "none", resize: "none", minHeight: 60, background: "#fffef0", fontFamily: "inherit" } })),
-                            scheduleOpen === origIdx && (React.createElement("div", { style: { background: "#eff6ff", border: "1.5px solid #93c5fd", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 } },
-                                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#1e40af", marginBottom: 2 } }, "\uD83D\uDCC5 利用曜日"),
-                                React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } },
-                                    DAY_LABELS.map(function(dl, di) {
-                                        var on = (p.days||[]).indexOf(di) >= 0;
-                                        return React.createElement("button", { key: di, onClick: function() { toggleScheduleDay(p.name, di); }, style: {
-                                            width: 32, height: 32, borderRadius: 8, border: "1.5px solid " + (on ? "#2563eb" : "#c7d2fe"),
-                                            background: on ? "#2563eb" : "white", color: on ? "white" : "#6366f1",
-                                            fontWeight: 700, fontSize: 12, cursor: "pointer", flexShrink: 0,
-                                        } }, dl);
-                                    })),
-                                React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#1e40af" } }, "\u23F0 利用時間帯"),
-                                React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
-                                    PERIOD_LABELS.map(function(pl) {
-                                        var on = (p.periods||[]).indexOf(pl) >= 0;
-                                        return React.createElement("button", { key: pl, onClick: function() { toggleSchedulePeriod(p.name, pl); }, style: {
-                                            padding: "5px 12px", borderRadius: 20, border: "1.5px solid " + (on ? "#2563eb" : "#c7d2fe"),
-                                            background: on ? "#2563eb" : "white", color: on ? "white" : "#6366f1",
-                                            fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap",
-                                        } }, pl);
-                                    })),
-                                React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 2 } },
-                                    React.createElement("button", { onClick: function() { setScheduleOpen(null); }, style: {
-                                        padding: "6px 20px", borderRadius: 20, border: "none",
-                                        background: "#2563eb", color: "white",
-                                        fontWeight: 700, fontSize: 12, cursor: "pointer",
-                                        boxShadow: "0 2px 8px rgba(37,99,235,.35)",
-                                    } }, "\u2713 決定"))))));
-                    })),
-                    React.createElement("div", { style: { display: "flex", gap: 6 } },
-                        React.createElement("input", { placeholder: "\u65B0\u3057\u3044\u5229\u7528\u8005\u540D\u2026", value: newName, onChange: handleNewNameChange, onKeyDown: handleNewNameKeyDown, style: { flex: 1, border: "1.5px solid #c0ccda", borderRadius: 6, padding: "5px 9px", fontSize: 12, outline: "none" } }),
-                        React.createElement("button", { onClick: handleAddPerson, style: { background: "#2d6a9f", color: "white", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, "\u8FFD\u52A0"))))),
+                        React.createElement("span", { style: { fontWeight: 700, color: "#1e3a5f", fontSize: 13 } }, "\u30c7\u30fc\u30bf")))),
             React.createElement("div", { style: { marginTop: 8 } },
                 React.createElement("button", { onClick: toggleDriverEdit, style: {
                         width: "100%", padding: "10px 14px", borderRadius: 10,
