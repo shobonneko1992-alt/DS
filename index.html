@@ -602,11 +602,10 @@ function PeopleListPage(props) {
 function PersonDetailPage(props) {
     var person = props.person, absent = props.absent;
     var onClose = props.onClose, onRename = props.onRename, onSetMemo = props.onSetMemo;
-    var onToggleAbsent = props.onToggleAbsent, onToggleDay = props.onToggleDay;
+    var onToggleDay = props.onToggleDay;
     var onTogglePeriod = props.onTogglePeriod, onRemove = props.onRemove, onSave = props.onSave, onShowLog = props.onShowLog;
     var [editName, setEditName] = React.useState(person.name);
     var [confirmDelete, setConfirmDelete] = React.useState(false);
-    var isAbsent = absent.has(person.name);
     var days = person.days || [];
     var periods = person.periods || [];
     var DAY_JP2 = ["\u6708","\u706b","\u6c34","\u6728","\u91d1"];
@@ -666,12 +665,7 @@ function PersonDetailPage(props) {
                         color: active?(pp2==="AM"?"#1e3a5f":"white"):"#c0ccda",
                     } }, pp2);
                 }))),
-            React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
-                React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u51fa\u5e2d\u72b6\u6cc1\uff08\u672c\u65e5\uff09"),
-                React.createElement("button", { onClick:function(){onToggleAbsent(person.name); if(onSave) onSave();}, style:{
-                    width:"100%", padding:"14px", borderRadius:10, fontSize:14, fontWeight:800, cursor:"pointer", border:"none",
-                    background: isAbsent?"#fee2e2":"#dcfce7", color: isAbsent?"#dc2626":"#16a34a",
-                } }, isAbsent?"\uD83D\uDCA4 \u672c\u65e5\u4f11\u307f\u3000\u2192\u3000\u51fa\u5e2d\u306b\u5909\u66f4":"\u2713 \u51fa\u5e2d\u4e2d\u3000\u2192\u3000\u4f11\u307f\u306b\u5909\u66f4")),
+
             React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
                 React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\uD83D\uDCDD \u30e1\u30e2"),
                 React.createElement("textarea", { value:person.memo||"", onChange:function(e){onSetMemo(person.name,e.target.value);}, onBlur:function(){ if(onSave) onSave(); }, placeholder:"\u30e1\u30e2\u3092\u5165\u529b\u2026", style:{ width:"100%", border:"1.5px solid #e0e7ef", borderRadius:8, padding:"10px 12px", fontSize:13, outline:"none", resize:"none", minHeight:110, fontFamily:"inherit", boxSizing:"border-box", lineHeight:1.6 } })),
@@ -1072,14 +1066,6 @@ function App() {
             }
             else {
                 next.add(name);
-                setAllGrids(function (g) {
-                    var ng = Object.assign({}, g);
-                    Object.keys(ng).forEach(function (k) {
-                        ng[k] = cloneGrid(g[k]);
-                        clearNameInGrid(ng[k], name);
-                    });
-                    return ng;
-                });
             }
             return next;
         });
@@ -1870,7 +1856,6 @@ function App() {
             onClose: function(){ setPersonDetailPage(null); },
             onRename: renamePerson,
             onSetMemo: setMemo,
-            onToggleAbsent: toggleAbsent,
             onToggleDay: toggleScheduleDay,
             onTogglePeriod: toggleSchedulePeriod,
             onRemove: removePerson,
@@ -2504,10 +2489,11 @@ function App() {
                                 var isSrcDragging = dragSeatSrc === sk;
                                 var isDstOver = dragSeatDst === sk && dragSeatSrc !== sk;
                                 var isQuickDragging = quickDragMode && isSrcDragging;
-                                var bg = colorBg[seatColor] || (isOpen ? "#e3f2fd" : isDup ? "#fff3e0" : name ? "#f1f8e9" : "#f8fafc");
+                                var isAbsentSeat = name && absent.has(name);
+                                var bg = colorBg[seatColor] || (isOpen ? "#e3f2fd" : isAbsentSeat ? "#e5e7eb" : isDup ? "#fff3e0" : name ? "#f1f8e9" : "#f8fafc");
                                 var bd = colorBorder[seatColor]
                                     ? "1.5px solid " + colorBorder[seatColor]
-                                    : (isOpen ? "2px solid #2d6a9f" : isDup ? "1.5px solid #ffb74d" : name ? "1.5px solid #aed581" : "1.5px dashed #cdd5df");
+                                    : (isOpen ? "2px solid #2d6a9f" : isAbsentSeat ? "1.5px solid #9ca3af" : isDup ? "1.5px solid #ffb74d" : name ? "1.5px solid #aed581" : "1.5px dashed #cdd5df");
                                 return (React.createElement("div", { key: si, "data-seat-key": sk, draggable: moveMode, onDragStart: moveMode ? function () { handleSeatDragStart(ci, si); } : undefined, onDragEnter: (moveMode || quickDragMode) ? function () { handleSeatDragEnter(ci, si); } : undefined, onDragEnd: moveMode ? handleSeatDragEnd : undefined, onDragOver: (moveMode || quickDragMode) ? function (e) { e.preventDefault(); } : undefined, style: { position: "relative", opacity: isSrcDragging ? 0.3 : 1, outline: isDstOver ? "2px solid #2d6a9f" : "none", borderRadius: 5 } },
                                     React.createElement("div", { onClick: function(e) { if (!moveMode && colorEditMode) { e.stopPropagation(); setSeatColor(ci, si, paintColor); return; } }, style: {
                                             display: "flex", alignItems: "center", gap: 4, padding: "4px 6px", borderRadius: 5,
@@ -2524,7 +2510,7 @@ function App() {
                                                 setOpenKey(isOpen ? null : skey);
                                                 setSearch("");
                                             }, style: { display: "flex", alignItems: "center", flex: 1, cursor: (!moveMode && colorEditMode) ? "crosshair" : (moveMode ? "grab" : "pointer"), userSelect: "none", minWidth: 0, WebkitUserSelect: "none" } },
-                                            React.createElement("span", { style: { flex: 1, fontSize: 11, fontWeight: name ? 600 : 400, color: name ? (isDup ? "#e65100" : "#1e3a5f") : "#a0aec0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name || "未配置")),
+                                            React.createElement("span", { style: { flex: 1, fontSize: 11, fontWeight: name ? 600 : 400, color: name ? (isDup ? "#e65100" : "#1e3a5f") : "#a0aec0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: (name && absent.has(name)) ? "line-through" : "none" } }, name || "未配置")),
                                         name && !moveMode && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flexShrink: 0 } },
                                             React.createElement("div", { onClick: handleTimeClick, style: { position: "relative", flexShrink: 0 } },
                                                 React.createElement("select", { value: time, onChange: function (e) { handleTimeChange(ci, si, e); }, onClick: handleTimeClick, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 11 } },
@@ -2577,15 +2563,11 @@ function App() {
                                 } }, showPeopleEdit ? "✕ 閉じる" : "✏️ 編集")),
                         showPeopleEdit && (React.createElement("div", { style: { marginBottom: 10, padding: 10, background: "#f8fafc", borderRadius: 8, border: "1.5px solid #e0e7ef" } },
                             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto" } }, people.map(function (p, i) {
-                                var isAbsent = absent.has(p.name);
                                 return (React.createElement("div", { key: i, style: { display: "flex", flexDirection: "column", gap: 3 } },
                                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } },
                                         React.createElement("div", { style: {
                                                 flex: 1, fontSize: 12, padding: "4px 8px", borderRadius: 6,
-                                                background: isAbsent ? "#ffe4e6" : "white",
-                                                border: "1px solid " + (isAbsent ? "#fda4af" : "#e0e7ef"),
-                                                color: isAbsent ? "#e11d48" : "#1e3a5f",
-                                                textDecoration: isAbsent ? "line-through" : "none",
+                                                background: "white", border: "1px solid #e0e7ef", color: "#1e3a5f",
                                             } }, p.name),
                                         React.createElement("button", { onClick: function () { toggleMemoOpen(i); }, style: {
                                                 background: p.memo ? "#fef9c3" : "#f0f4f8",
@@ -2593,24 +2575,20 @@ function App() {
                                                 borderRadius: 6, padding: "4px 7px", fontSize: 11,
                                                 color: p.memo ? "#854d0e" : "#718096",
                                                 cursor: "pointer", fontWeight: 700, flexShrink: 0,
-                                            } }, "\uD83D\uDCDD"),
-                                        React.createElement("button", { onClick: function () { toggleAbsent(p.name); }, style: {
-                                                background: isAbsent ? "#e5e7eb" : "#fef3c7",
-                                                border: "none", borderRadius: 6, padding: "4px 7px", fontSize: 11,
-                                                color: isAbsent ? "#6b7280" : "#92400e",
-                                                cursor: "pointer", fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap",
-                                            } }, isAbsent ? "出席" : "休み")),
+                                            } }, "\uD83D\uDCDD")),
                                     memoOpen === i && (React.createElement("textarea", { value: p.memo, onChange: function (e) { setMemo(p.name, e.target.value); }, placeholder: "\u30E1\u30E2\u3092\u5165\u529B\u2026", style: { width: "100%", border: "1.5px solid #fde047", borderRadius: 6, padding: "6px 8px", fontSize: 12, outline: "none", resize: "none", minHeight: 60, background: "#fffef0", fontFamily: "inherit" } }))));
                             })))),
-                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, people.map(function (p, i) {
+                        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, sortedPeople.map(function (p, i) {
                             var isA = assigned.has(p.name), isDup = dups.has(p.name), isOff = absent.has(p.name);
-                            return (React.createElement("div", { key: i, style: {
+                            return (React.createElement("div", { key: i, onClick: function() { toggleAbsent(p.name); }, style: {
                                     padding: "3px 10px", borderRadius: 20, fontSize: 11, display: "flex", alignItems: "center", gap: 4,
                                     fontWeight: isA ? 600 : 400,
                                     background: isOff ? "#ffe4e6" : isDup ? "#fff3e0" : isA ? "#fef9c3" : "#f0f4f8",
                                     color: isOff ? "#e11d48" : isDup ? "#e65100" : isA ? "#854d0e" : "#64748b",
                                     border: isOff ? "1px solid #fda4af" : isDup ? "1px solid #ffb74d" : isA ? "1px solid #fde047" : "1px solid #c0ccda",
                                     textDecoration: isOff ? "line-through" : "none",
+                                    cursor: "pointer",
+                                    userSelect: "none",
                                 } },
                                 isOff ? "💤" : isDup ? "⚠️" : isA ? "✓" : "○",
                                 " ",
