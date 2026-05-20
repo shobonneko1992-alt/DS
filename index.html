@@ -462,7 +462,7 @@ function PeopleListPage(props) {
     var onDragStart = props.onDragStart, onDragEnter = props.onDragEnter, onDragEnd = props.onDragEnd;
     var onTouchStartDrag = props.onTouchStartDrag, onTouchMoveDrag = props.onTouchMoveDrag, onTouchEndDrag = props.onTouchEndDrag;
     var peopleListRef = props.peopleListRef;
-    var onAddPerson = props.onAddPerson, setNewName = props.setNewName, onRemove = props.onRemove, onSave = props.onSave;
+    var onAddPerson = props.onAddPerson, setNewName = props.setNewName, onRemove = props.onRemove, onSave = props.onSave, onShowLog = props.onShowLog;
     var [localInput, setLocalInput] = React.useState("");
     var [sortMode, setSortMode] = React.useState("added");
     var [reordering, setReordering] = React.useState(false);
@@ -517,7 +517,11 @@ function PeopleListPage(props) {
             selecting
                 ? React.createElement("button", { onClick: function(){ if(selectedCount>0) setConfirmBulkDelete(true); }, style:{ background: selectedCount>0?"#dc2626":"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"6px 14px", fontSize:12, cursor: selectedCount>0?"pointer":"default", fontWeight:700 } }, "\u524a\u9664(" + selectedCount + ")")
                 : React.createElement("span", { style:{ fontSize:11, background:"rgba(255,255,255,.2)", borderRadius:10, padding:"2px 8px", fontWeight:700 } }, people.length + "\u540d"),
-            !selecting && React.createElement("button", { onClick: function(){ if(onSave) onSave(); }, style:{ background:"rgba(255,255,255,.25)", border:"none", color:"white", borderRadius:8, padding:"6px 12px", fontSize:12, cursor:"pointer", fontWeight:700 } }, "\uD83D\uDCBE \u4fdd\u5b58")),
+            !selecting && React.createElement(SaveButton, {
+                onSave: onSave,
+                onShowLog: onShowLog,
+                style: { padding: "6px 12px", borderRadius: 8, fontSize: 12 },
+            })),
         React.createElement("div", { style:{ padding:"6px 10px 4px", background:"white", borderBottom:"1px solid #e0e7ef", display:"flex", gap:5, flexShrink:0 } },
             !selecting && sortBtns.map(function(item){
                 var v = item[0], lbl = item[1];
@@ -599,21 +603,13 @@ function PersonDetailPage(props) {
     var person = props.person, absent = props.absent;
     var onClose = props.onClose, onRename = props.onRename, onSetMemo = props.onSetMemo;
     var onToggleAbsent = props.onToggleAbsent, onToggleDay = props.onToggleDay;
-    var onTogglePeriod = props.onTogglePeriod, onRemove = props.onRemove, onSave = props.onSave;
+    var onTogglePeriod = props.onTogglePeriod, onRemove = props.onRemove, onSave = props.onSave, onShowLog = props.onShowLog;
     var [editName, setEditName] = React.useState(person.name);
     var [confirmDelete, setConfirmDelete] = React.useState(false);
-    var [saved, setSaved] = React.useState(false);
     var isAbsent = absent.has(person.name);
     var days = person.days || [];
     var periods = person.periods || [];
     var DAY_JP2 = ["\u6708","\u706b","\u6c34","\u6728","\u91d1"];
-    function commitAndSave() {
-        var t = editName.trim();
-        if (t && t !== person.name) onRename(person.name, t);
-        if (onSave) onSave();
-        setSaved(true);
-        setTimeout(function(){ setSaved(false); }, 1500);
-    }
     function handleClose() {
         var t = editName.trim();
         if (t && t !== person.name) onRename(person.name, t);
@@ -637,11 +633,15 @@ function PersonDetailPage(props) {
         React.createElement("div", { style: { background:"linear-gradient(135deg,#1e3a5f,#2d6a9f)", color:"white", padding:"12px 14px", display:"flex", alignItems:"center", gap:10, flexShrink:0 } },
             React.createElement("button", { onClick:handleClose, style:{ background:"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"8px 16px", fontSize:13, cursor:"pointer", fontWeight:700 } }, "\u2190 \u623b\u308b"),
             React.createElement("div", { style:{ fontWeight:800, fontSize:16, flex:1 } }, "\uD83D\uDC64 \u5229\u7528\u8005\u8a73\u7d30"),
-            React.createElement("button", { onClick: commitAndSave, style:{
-                background: saved ? "#22c55e" : "rgba(255,255,255,.25)",
-                border:"none", color:"white", borderRadius:8, padding:"8px 14px", fontSize:12, cursor:"pointer", fontWeight:700,
-                transition:"background 0.3s",
-            } }, saved ? "\u2713 \u4fdd\u5b58\u6e08" : "\uD83D\uDCBE \u4fdd\u5b58")),
+            React.createElement(SaveButton, {
+                onSave: function(){
+                    var t = editName.trim();
+                    if (t && t !== person.name) onRename(person.name, t);
+                    return onSave ? onSave() : true;
+                },
+                onShowLog: onShowLog,
+                style: { padding: "8px 14px", borderRadius: 8, fontSize: 12 },
+            })),
         React.createElement("div", { style:{ padding:14, display:"flex", flexDirection:"column", gap:10 } },
             React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
                 React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u6c0f\u540d"),
@@ -692,6 +692,47 @@ function PeriodBtns(props) {
                 color: active ? color : "#718096",
             } }, lbl));
     })));
+}
+function SaveButton(props) {
+    var onSave = props.onSave, onShowLog = props.onShowLog, style = props.style;
+    var [status, setStatus] = React.useState("");
+    var lpt = React.useRef(null);
+    function doSave() {
+        var ok = false;
+        try { ok = onSave ? onSave() : true; } catch(err) { ok = false; }
+        setStatus(ok !== false ? "ok" : "err");
+        setTimeout(function(){ setStatus(""); }, 2000);
+    }
+    function startLongPress() {
+        lpt.current = setTimeout(function(){
+            lpt.current = "fired";
+            if (onShowLog) onShowLog();
+        }, 600);
+    }
+    function endLongPress() {
+        if (lpt.current && lpt.current !== "fired") clearTimeout(lpt.current);
+        lpt.current = null;
+    }
+    var baseStyle = Object.assign({
+        border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, whiteSpace: "nowrap",
+        padding: "6px 14px", borderRadius: 8,
+        transition: "background 0.25s",
+        background: status === "ok" ? "#22c55e" : status === "err" ? "#ef4444" : "rgba(255,255,255,.25)",
+        color: "white",
+        userSelect: "none",
+    }, style || {});
+    var label = status === "ok" ? "✓ 保存済" : status === "err" ? "✗ エラー" : "💾 保存";
+    return React.createElement("button", {
+        onClick: function(){ if (lpt.current !== "fired") doSave(); lpt.current = null; },
+        onContextMenu: function(e){ e.preventDefault(); if (onShowLog) onShowLog(); },
+        onMouseDown: startLongPress,
+        onMouseUp: endLongPress,
+        onMouseLeave: endLongPress,
+        onTouchStart: startLongPress,
+        onTouchEnd: endLongPress,
+        onTouchMove: endLongPress,
+        style: baseStyle,
+    }, label);
 }
 function App() {
     var today = new Date();
@@ -791,7 +832,6 @@ function App() {
     var [openMemoCar, setOpenMemoCar] = useState(null);
     var [calView, setCalView] = useState("month");
     var [viewDate, setViewDate] = useState(new Date(today.getTime()));
-    var [saveStatus, setSaveStatus] = useState("");
     var [saveLog, setSaveLog] = useState(function(){ try { return JSON.parse(localStorage.getItem("ds_savelog")||"[]"); } catch(e){ return []; } });
     var [showSaveLog, setShowSaveLog] = useState(false);
     var [showBulk, setShowBulk] = useState(false);
@@ -876,12 +916,11 @@ function App() {
                 try { localStorage.setItem("ds_savelog", JSON.stringify(next)); } catch(e){}
                 return next;
             });
-            setSaveStatus("ok");
+            return true;
         }
         catch (e) {
-            setSaveStatus("err");
+            return false;
         }
-        setTimeout(function () { setSaveStatus(""); }, 2000);
     }
     function handlePrint() {
         if (!selectedDate || !grid) return;
@@ -1836,6 +1875,7 @@ function App() {
             onTogglePeriod: toggleSchedulePeriod,
             onRemove: removePerson,
             onSave: handleSave,
+            onShowLog: function(){ setShowSaveLog(true); },
         }),
         showSaveLog && React.createElement("div", { onClick: function(){ setShowSaveLog(false); }, style:{ position:"fixed", inset:0, zIndex:9500, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"flex-end", justifyContent:"center" } },
             React.createElement("div", { onClick: function(e){ e.stopPropagation(); }, style:{ background:"white", borderRadius:"20px 20px 0 0", padding:"20px 16px 32px", width:"100%", maxWidth:480, maxHeight:"70vh", display:"flex", flexDirection:"column" } },
@@ -1872,6 +1912,7 @@ function App() {
             onAddPerson: handleAddPerson,
             onRemove: removePerson,
             onSave: handleSave,
+            onShowLog: function(){ setShowSaveLog(true); },
         }),
         toast && (React.createElement("div", { style: { position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)", background: "#1e3a5f", color: "white", padding: "10px 24px", borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 99999, boxShadow: "0 4px 12px rgba(0,0,0,.3)" } },
             "\u2713 ",
@@ -1887,25 +1928,11 @@ function App() {
             React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 } },
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 } },
                     React.createElement("span", { style: { fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" } }, "\u30C7\u30A4\u30B5\u30FC\u30D3\u30B9 \u9001\u8FCE\u8868"),
-                    React.createElement("button", {
-                        onClick: handleSave,
-                        onContextMenu: function(e){ e.preventDefault(); setShowSaveLog(true); },
-                        onTouchStart: function(e){
-                            var t = setTimeout(function(){ setShowSaveLog(true); }, 600);
-                            e.currentTarget._lpt = t;
-                        },
-                        onTouchEnd: function(e){
-                            clearTimeout(e.currentTarget._lpt);
-                        },
-                        onTouchMove: function(e){
-                            clearTimeout(e.currentTarget._lpt);
-                        },
-                        style: {
-                            padding: "4px 10px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap", marginLeft: 6,
-                            background: saveStatus === "ok" ? "#e8f5e9" : saveStatus === "err" ? "#fee2e2" : "rgba(255,255,255,.2)",
-                            color: saveStatus === "ok" ? "#2e7d32" : saveStatus === "err" ? "#e53e3e" : "white",
-                        }
-                    }, saveStatus === "ok" ? "\u2713 \u4fdd\u5b58\u6e08" : saveStatus === "err" ? "\u2717 \u30a8\u30e9\u30fc" : "\uD83D\uDCBE \u4fdd\u5b58"),
+                    React.createElement(SaveButton, {
+                        onSave: handleSave,
+                        onShowLog: function(){ setShowSaveLog(true); },
+                        style: { marginLeft: 6, padding: "4px 10px", borderRadius: 16, fontSize: 11 },
+                    }),
                     selectedDate && React.createElement("button", { onClick: handlePrint, style: {
                             padding: "4px 10px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
                             background: "rgba(255,255,255,.2)", color: "white",
