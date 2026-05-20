@@ -463,12 +463,14 @@ function PeopleListPage(props) {
     var onTouchStartDrag = props.onTouchStartDrag, onTouchMoveDrag = props.onTouchMoveDrag, onTouchEndDrag = props.onTouchEndDrag;
     var peopleListRef = props.peopleListRef;
     var onAddPerson = props.onAddPerson, setNewName = props.setNewName, onRemove = props.onRemove, onSave = props.onSave, onShowLog = props.onShowLog;
+    var onGetShareText = props.onGetShareText, onToast = props.onToast;
     var [localInput, setLocalInput] = React.useState("");
     var [sortMode, setSortMode] = React.useState("added");
     var [reordering, setReordering] = React.useState(false);
     var [selecting, setSelecting] = React.useState(false);
     var [selected, setSelected] = React.useState({});
     var [confirmBulkDelete, setConfirmBulkDelete] = React.useState(false);
+    var [sharePreview, setSharePreview] = React.useState(null);
 
     function handleLocalChange(e){ setLocalInput(e.target.value); setNewName(e.target.value); }
     function handleLocalKeyDown(e){
@@ -511,11 +513,30 @@ function PeopleListPage(props) {
                 React.createElement("div", { style:{ display:"flex", gap:10 } },
                     React.createElement("button", { onClick: function(){ setConfirmBulkDelete(false); }, style:{ flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #e0e7ef", background:"white", color:"#718096", fontSize:14, fontWeight:700, cursor:"pointer" } }, "\u30ad\u30e3\u30f3\u30bb\u30eb"),
                     React.createElement("button", { onClick: handleBulkDelete, style:{ flex:1, padding:"12px", borderRadius:10, border:"none", background:"#dc2626", color:"white", fontSize:14, fontWeight:700, cursor:"pointer" } }, "\u524a\u9664\u3059\u308b")))),
+        sharePreview !== null && React.createElement("div", { style:{ position:"fixed", inset:0, zIndex:9000, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 } },
+            React.createElement("div", { style:{ background:"white", borderRadius:16, padding:"20px", width:"100%", maxWidth:360 } },
+                React.createElement("div", { style:{ fontWeight:800, fontSize:15, color:"#1e3a5f", marginBottom:4 } }, "\uD83D\uDCE4 \u9078\u629E\u3057\u305F\u5229\u7528\u8005\u3092\u9001\u308B"),
+                React.createElement("div", { style:{ fontSize:11, color:"#718096", marginBottom:10 } }, "\u4EE5\u4E0B\u306E\u30C6\u30AD\u30B9\u30C8\u3092\u30B3\u30D4\u30FC\u3057\u3066\u9001\u308A\u5148\u306B\u8CBC\u308A\u4ED8\u3051\u3066\u304F\u3060\u3055\u3044"),
+                React.createElement("textarea", { readOnly:true, value:sharePreview, onClick:function(e){ e.target.select(); }, style:{ width:"100%", height:100, border:"1.5px solid #e0e7ef", borderRadius:8, padding:"8px", fontSize:10, fontFamily:"monospace", resize:"none", outline:"none", boxSizing:"border-box" } }),
+                React.createElement("div", { style:{ display:"flex", gap:8, marginTop:10 } },
+                    React.createElement("button", { onClick:function(){ setSharePreview(null); }, style:{ flex:1, padding:"10px", borderRadius:10, border:"1.5px solid #e0e7ef", background:"white", color:"#718096", fontSize:13, fontWeight:700, cursor:"pointer" } }, "\u9589\u3058\u308b"),
+                    React.createElement("button", { onClick:function(){
+                        var txt = sharePreview;
+                        var doToast = function(){ if(onToast) onToast("\uD83D\uDCCB \u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\uFF01"); setSharePreview(null); };
+                        if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(doToast).catch(function(){ var el=document.createElement("textarea"); el.value=txt; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); doToast(); }); }
+                        else { var el=document.createElement("textarea"); el.value=txt; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); doToast(); }
+                    }, style:{ flex:2, padding:"10px", borderRadius:10, border:"none", background:"#2d6a9f", color:"white", fontSize:13, fontWeight:700, cursor:"pointer" } }, "\uD83D\uDCCB \u30B3\u30D4\u30FC\u3059\u308B")))),
         React.createElement("div", { style: { background:"linear-gradient(135deg,#1e3a5f,#2d6a9f)", color:"white", padding:"10px 14px", display:"flex", alignItems:"center", gap:10, flexShrink:0 } },
             React.createElement("button", { onClick: function(){ if(selecting){ cancelSelect(); } else { if(onSave) onSave(); onClose(); } }, style:{ background:"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"6px 14px", fontSize:12, cursor:"pointer", fontWeight:700 } }, selecting ? "\u30ad\u30e3\u30f3\u30bb\u30eb" : "\u2190 \u623b\u308b"),
             React.createElement("div", { style:{ fontWeight:800, fontSize:14, flex:1 } }, selecting ? ("\u2611 " + selectedCount + "\u540d\u9078\u629e\u4e2d") : "\uD83D\uDCCB \u5229\u7528\u8005\u4e00\u89a7"),
             selecting
-                ? React.createElement("button", { onClick: function(){ if(selectedCount>0) setConfirmBulkDelete(true); }, style:{ background: selectedCount>0?"#dc2626":"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"6px 14px", fontSize:12, cursor: selectedCount>0?"pointer":"default", fontWeight:700 } }, "\u524a\u9664(" + selectedCount + ")")
+                ? React.createElement(React.Fragment, null,
+                    selectedCount > 0 && React.createElement("button", { onClick: function(){
+                        var selectedPeople = people.filter(function(p){ return selected[p.name]; });
+                        var txt = onGetShareText ? onGetShareText(selectedPeople) : "";
+                        setSharePreview(txt);
+                    }, style:{ background:"#2d6a9f", border:"none", color:"white", borderRadius:8, padding:"6px 12px", fontSize:12, cursor:"pointer", fontWeight:700 } }, "\uD83D\uDCE4 \u9001\u308B(" + selectedCount + ")"),
+                    React.createElement("button", { onClick: function(){ if(selectedCount>0) setConfirmBulkDelete(true); }, style:{ background: selectedCount>0?"#dc2626":"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"6px 14px", fontSize:12, cursor: selectedCount>0?"pointer":"default", fontWeight:700 } }, "\u524a\u9664(" + selectedCount + ")"))
                 : React.createElement("span", { style:{ fontSize:11, background:"rgba(255,255,255,.2)", borderRadius:10, padding:"2px 8px", fontWeight:700 } }, people.length + "\u540d"),
             !selecting && React.createElement(SaveButton, {
                 onSave: onSave,
@@ -1946,6 +1967,11 @@ function App() {
             onRemove: removePerson,
             onSave: handleSave,
             onShowLog: function(){ setShowSaveLog(true); },
+            onGetShareText: function(selectedPeople){
+                var data = { type: "dscar_people_v1", people: selectedPeople };
+                return JSON.stringify(data);
+            },
+            onToast: function(msg){ setToast(msg); setTimeout(function(){ setToast(""); }, 2000); },
         }),
         toast && (React.createElement("div", { style: { position: "fixed", bottom: 30, left: "50%", transform: "translateX(-50%)", background: "#1e3a5f", color: "white", padding: "10px 24px", borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 99999, boxShadow: "0 4px 12px rgba(0,0,0,.3)" } },
             "\u2713 ",
