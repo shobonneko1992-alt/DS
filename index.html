@@ -604,8 +604,10 @@ function PersonDetailPage(props) {
     var onClose = props.onClose, onRename = props.onRename, onSetMemo = props.onSetMemo;
     var onToggleDay = props.onToggleDay;
     var onTogglePeriod = props.onTogglePeriod, onRemove = props.onRemove, onSave = props.onSave, onShowLog = props.onShowLog;
+    var onGetShareText = props.onGetShareText, onToast = props.onToast;
     var [editName, setEditName] = React.useState(person.name);
     var [confirmDelete, setConfirmDelete] = React.useState(false);
+    var [sharePreview, setSharePreview] = React.useState(null);
     var days = person.days || [];
     var periods = person.periods || [];
     var DAY_JP2 = ["\u6708","\u706b","\u6c34","\u6728","\u91d1"];
@@ -629,9 +631,32 @@ function PersonDetailPage(props) {
                 React.createElement("div", { style:{ display:"flex", gap:10 } },
                     React.createElement("button", { onClick: function(){ setConfirmDelete(false); }, style:{ flex:1, padding:"12px", borderRadius:10, border:"1.5px solid #e0e7ef", background:"white", color:"#718096", fontSize:14, fontWeight:700, cursor:"pointer" } }, "\u30ad\u30e3\u30f3\u30bb\u30eb"),
                     React.createElement("button", { onClick: handleDelete, style:{ flex:1, padding:"12px", borderRadius:10, border:"none", background:"#dc2626", color:"white", fontSize:14, fontWeight:700, cursor:"pointer" } }, "\u524a\u9664\u3059\u308b")))),
+        sharePreview !== null && React.createElement("div", { style:{ position:"fixed", inset:0, zIndex:9000, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 } },
+            React.createElement("div", { style:{ background:"white", borderRadius:16, padding:"20px", width:"100%", maxWidth:360 } },
+                React.createElement("div", { style:{ fontWeight:800, fontSize:15, color:"#1e3a5f", marginBottom:4 } }, "\uD83D\uDCE4 \u9001\u308B"),
+                React.createElement("div", { style:{ fontSize:11, color:"#718096", marginBottom:10 } }, "\u4EE5\u4E0B\u306E\u30C6\u30AD\u30B9\u30C8\u3092\u30B3\u30D4\u30FC\u3057\u3066\u9001\u308A\u5148\u306B\u8CBC\u308A\u4ED8\u3051\u3066\u304F\u3060\u3055\u3044"),
+                React.createElement("textarea", { readOnly:true, value:sharePreview, onClick:function(e){ e.target.select(); }, style:{ width:"100%", height:100, border:"1.5px solid #e0e7ef", borderRadius:8, padding:"8px", fontSize:10, fontFamily:"monospace", resize:"none", outline:"none", boxSizing:"border-box" } }),
+                React.createElement("div", { style:{ display:"flex", gap:8, marginTop:10 } },
+                    React.createElement("button", { onClick:function(){ setSharePreview(null); }, style:{ flex:1, padding:"10px", borderRadius:10, border:"1.5px solid #e0e7ef", background:"white", color:"#718096", fontSize:13, fontWeight:700, cursor:"pointer" } }, "\u9589\u3058\u308b"),
+                    React.createElement("button", { onClick:function(){
+                        var txt = sharePreview;
+                        var doToast = function(){ if (onToast) onToast("\uD83D\uDCCB \u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\uFF01"); setSharePreview(null); };
+                        if (navigator.clipboard) { navigator.clipboard.writeText(txt).then(doToast).catch(function(){ var el=document.createElement("textarea"); el.value=txt; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); doToast(); }); }
+                        else { var el=document.createElement("textarea"); el.value=txt; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); doToast(); }
+                    }, style:{ flex:2, padding:"10px", borderRadius:10, border:"none", background:"#2d6a9f", color:"white", fontSize:13, fontWeight:700, cursor:"pointer" } }, "\uD83D\uDCCB \u30B3\u30D4\u30FC\u3059\u308B")))),
         React.createElement("div", { style: { background:"linear-gradient(135deg,#1e3a5f,#2d6a9f)", color:"white", padding:"12px 14px", display:"flex", alignItems:"center", gap:10, flexShrink:0 } },
             React.createElement("button", { onClick:handleClose, style:{ background:"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"8px 16px", fontSize:13, cursor:"pointer", fontWeight:700 } }, "\u2190 \u623b\u308b"),
             React.createElement("div", { style:{ fontWeight:800, fontSize:16, flex:1 } }, "\uD83D\uDC64 \u5229\u7528\u8005\u8a73\u7d30"),
+            React.createElement("button", { onClick: function(){
+                var currentPerson = {
+                    name: editName.trim() || person.name,
+                    days: person.days || [],
+                    periods: person.periods || [],
+                    memo: person.memo || "",
+                };
+                var txt = onGetShareText ? onGetShareText(currentPerson) : "";
+                setSharePreview(txt);
+            }, style:{ background:"rgba(255,255,255,.2)", border:"none", color:"white", borderRadius:8, padding:"8px 12px", fontSize:13, cursor:"pointer", fontWeight:700, whiteSpace:"nowrap" } }, "\uD83D\uDCE4 \u9001\u308B"),
             React.createElement(SaveButton, {
                 onSave: function(){
                     var t = editName.trim();
@@ -1631,6 +1656,10 @@ function App() {
         var data = { type: "dscar_people_v1", people: people };
         return JSON.stringify(data);
     }
+    function getSinglePersonDataText(person) {
+        var data = { type: "dscar_person_v1", person: { name: person.name, days: person.days || [], periods: person.periods || [], memo: person.memo || "" } };
+        return JSON.stringify(data);
+    }
     function handleReceiveData() {
         setReceiveError("");
         setReceiveSuccess(false);
@@ -1661,6 +1690,23 @@ function App() {
             }
             // JSON形式
             var data = JSON.parse(raw);
+            // 個人データ形式
+            if (data.type === "dscar_person_v1" && data.person) {
+                var p = data.person;
+                setPeople(function(prev) {
+                    var idx = prev.findIndex(function(x){ return x.name === p.name; });
+                    if (idx >= 0) {
+                        var next = prev.slice();
+                        next[idx] = Object.assign({}, next[idx], { days: p.days || [], periods: p.periods || [], memo: p.memo !== undefined ? p.memo : next[idx].memo });
+                        return next;
+                    } else {
+                        return prev.concat([{ name: p.name, memo: p.memo || "", days: p.days || [], periods: p.periods || [] }]);
+                    }
+                });
+                setReceiveSuccess(true);
+                setReceiveText("");
+                return;
+            }
             if (data.type !== "dscar_people_v1" || !Array.isArray(data.people)) {
                 setReceiveError("データの形式が正しくありません");
                 return;
@@ -1861,6 +1907,8 @@ function App() {
             onRemove: removePerson,
             onSave: handleSave,
             onShowLog: function(){ setShowSaveLog(true); },
+            onGetShareText: function(p){ return getSinglePersonDataText(p); },
+            onToast: function(msg){ setToast(msg); setTimeout(function(){ setToast(""); }, 2000); },
         }),
         showSaveLog && React.createElement("div", { onClick: function(){ setShowSaveLog(false); }, style:{ position:"fixed", inset:0, zIndex:9500, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"flex-end", justifyContent:"center" } },
             React.createElement("div", { onClick: function(e){ e.stopPropagation(); }, style:{ background:"white", borderRadius:"20px 20px 0 0", padding:"20px 16px 32px", width:"100%", maxWidth:480, maxHeight:"70vh", display:"flex", flexDirection:"column" } },
@@ -2294,7 +2342,7 @@ function App() {
                 React.createElement("div", { style: { background: "white", borderRadius: 16, padding: 20, width: "100%", maxWidth: 360, maxHeight: "90vh", overflowY: "auto" } },
                     React.createElement("div", { style: { fontWeight: 800, fontSize: 16, color: "#1e3a5f", marginBottom: 12, textAlign: "center" } }, "\uD83D\uDCE8 \u5229\u7528\u8005\u30C7\u30FC\u30BF\u3092\u9001\u308B"),
                     React.createElement("div", null,
-                        React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u4EE5\u4E0B\u306E\u30C6\u30AD\u30B9\u30C8\u3092\u30B3\u30D4\u30FC\u3057\u3066LINE\u3084\u30E1\u30FC\u30EB\u3067\u9001\u3063\u3066\u304F\u3060\u3055\u3044"),
+                        React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u5229\u7528\u8005\u4E00\u89A7\uff08\u6C0F\u540D\u30FB\u66DC\u65E5\u30FB\u6642\u9593\u5E2F\u30FB\u30E1\u30E2\uff09\u3092\u30B3\u30D4\u30FC\u3057\u3066LINE\u3084\u30E1\u30FC\u30EB\u3067\u9001\u3063\u3066\u304F\u3060\u3055\u3044"),
                         React.createElement("textarea", { readOnly: true, value: getPeopleDataText(), style: { width: "100%", height: 120, border: "1.5px solid #e0e7ef", borderRadius: 8, padding: "8px", fontSize: 10, fontFamily: "monospace", resize: "none", outline: "none" }, onClick: function (e) { e.target.select(); } }),
                         React.createElement("button", { onClick: function () {
                                 var txt = getPeopleDataText();
@@ -2319,11 +2367,9 @@ function App() {
                     receiveSuccess ? (React.createElement("div", { style: { textAlign: "center", padding: "20px 0" } },
                         React.createElement("div", { style: { fontSize: 40, marginBottom: 10 } }, "\u2705"),
                         React.createElement("div", { style: { fontWeight: 800, fontSize: 15, color: "#059669", marginBottom: 8 } }, "\u30A4\u30F3\u30DD\u30FC\u30C8\u5B8C\u4E86\uFF01"),
-                        React.createElement("div", { style: { fontSize: 12, color: "#718096" } },
-                            people.length,
-                            "\u540D\u306E\u5229\u7528\u8005\u30C7\u30FC\u30BF\u3092\u53D6\u308A\u8FBC\u307F\u307E\u3057\u305F"),
+                        React.createElement("div", { style: { fontSize: 12, color: "#718096" } }, "\u5229\u7528\u8005\u30C7\u30FC\u30BF\u3092\u53D6\u308A\u8FBC\u307F\u307E\u3057\u305F"),
                         React.createElement("button", { onClick: function () { setShowDataReceive(false); setReceiveSuccess(false); }, style: { marginTop: 16, width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "#059669", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "\u9589\u3058\u308B"))) : (React.createElement("div", null,
-                        React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u9001\u308A\u624B\u304B\u3089\u3082\u3089\u3063\u305F\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u304F\u3060\u3055\u3044"),
+                        React.createElement("div", { style: { fontSize: 12, color: "#718096", marginBottom: 8 } }, "\u9001\u308A\u624B\u304B\u3089\u3082\u3089\u3063\u305F\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u3066\u304F\u3060\u3055\u3044\u3002\u5229\u7528\u8005\u4E00\u89A7\u3001\u307E\u305F\u306F\u500B\u4EBA\u30C7\u30FC\u30BF\u306E\u3069\u3061\u3089\u3067\u3082\u53D7\u3051\u53D6\u308C\u307E\u3059\u3002"),
                         React.createElement("textarea", { value: receiveText, onChange: function (e) { setReceiveText(e.target.value); setReceiveError(""); }, placeholder: "\u3053\u3053\u306B\u30C6\u30AD\u30B9\u30C8\u3092\u8CBC\u308A\u4ED8\u3051\u2026", style: { width: "100%", height: 120, border: "1.5px solid " + (receiveError ? "#fca5a5" : "#e0e7ef"), borderRadius: 8, padding: "8px", fontSize: 10, fontFamily: "monospace", resize: "none", outline: "none" } }),
                         receiveError && React.createElement("div", { style: { fontSize: 12, color: "#e53e3e", marginTop: 6 } },
                             "\u26A0\uFE0F ",
