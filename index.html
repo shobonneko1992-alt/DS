@@ -254,6 +254,7 @@ function WeekTable(props) {
     function printWeek(sections) {
         var html = buildWeekPrintHtml(sections);
         var w = window.open("", "_blank");
+        if (!w) { alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してから再度お試しください。"); return; }
         w.document.write(html);
         w.document.close();
         w.focus();
@@ -678,6 +679,20 @@ function PersonDetailPage(props) {
             React.createElement("button", { onClick:function(){ setConfirmDelete(true); }, style:{ padding:"13px", borderRadius:12, border:"1.5px solid #fca5a5", background:"white", color:"#dc2626", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 } }, "\uD83D\uDDD1\uFE0F \u3053\u306e\u5229\u7528\u8005\u3092\u524a\u9664")));
 }
 
+function PeriodBtns(props) {
+    var value = props.value, setter = props.setter, color = props.color, bg = props.bg;
+    return (React.createElement("div", { style: { display: "flex", gap: 6 } }, [["both", "午前＋午後"], ["AM", "午前のみ"], ["PM", "午後のみ"]].map(function (item) {
+        var v = item[0], lbl = item[1];
+        var active = value === v;
+        return (React.createElement("button", { key: v, onClick: function () { setter(v); }, style: {
+                flex: 1, padding: "7px 4px", borderRadius: 8,
+                fontSize: 11, fontWeight: 700, cursor: "pointer",
+                border: "1.5px solid " + (active ? color : "#e0e7ef"),
+                background: active ? bg : "white",
+                color: active ? color : "#718096",
+            } }, lbl));
+    })));
+}
 function App() {
     var today = new Date();
     // ── localStorage から前回のデータを復元 ─────────────────────────────
@@ -777,6 +792,8 @@ function App() {
     var [calView, setCalView] = useState("month");
     var [viewDate, setViewDate] = useState(new Date(today.getTime()));
     var [saveStatus, setSaveStatus] = useState("");
+    var [saveLog, setSaveLog] = useState(function(){ try { return JSON.parse(localStorage.getItem("ds_savelog")||"[]"); } catch(e){ return []; } });
+    var [showSaveLog, setShowSaveLog] = useState(false);
     var [showBulk, setShowBulk] = useState(false);
     var [showCopyMenu, setShowCopyMenu] = useState(false);
     var [bulkSource, setBulkSource] = useState(null);
@@ -827,23 +844,24 @@ function App() {
     function onTouchEnd() { lastDist.current = null; startTouches.current = null; }
     useEffect(function () {
         try {
+            localStorage.setItem("ds_grids", JSON.stringify(allGrids));
+            localStorage.setItem("ds_people", JSON.stringify(people));
+            localStorage.setItem("ds_absent", JSON.stringify(Array.from(absent)));
+            localStorage.setItem("ds_carNames", JSON.stringify(carNames));
+            localStorage.setItem("ds_drivers", JSON.stringify(drivers));
+            localStorage.setItem("ds_driverList", JSON.stringify(driverList));
             localStorage.setItem("ds_autosave", JSON.stringify({
+                savedAt: new Date().toLocaleString("ja-JP"),
                 allGrids: allGrids,
                 people: people,
                 absent: Array.from(absent),
                 carNames: carNames,
                 drivers: drivers,
                 driverList: driverList,
-                savedAt: new Date().toLocaleString("ja-JP"),
             }));
         }
         catch (e) { }
     }, [allGrids, people, absent, carNames, drivers, driverList]);
-    // people変更時はds_peopleキーにも即座に同期（全画面共通）
-    useEffect(function () {
-        try { localStorage.setItem("ds_people", JSON.stringify(people)); }
-        catch (e) { }
-    }, [people]);
     function handleSave() {
         try {
             localStorage.setItem("ds_grids", JSON.stringify(allGrids));
@@ -852,6 +870,12 @@ function App() {
             localStorage.setItem("ds_carNames", JSON.stringify(carNames));
             localStorage.setItem("ds_drivers", JSON.stringify(drivers));
             localStorage.setItem("ds_driverList", JSON.stringify(driverList));
+            var ts = new Date().toLocaleString("ja-JP");
+            setSaveLog(function(prev){
+                var next = [ts].concat(prev).slice(0, 30);
+                try { localStorage.setItem("ds_savelog", JSON.stringify(next)); } catch(e){}
+                return next;
+            });
             setSaveStatus("ok");
         }
         catch (e) {
@@ -934,6 +958,7 @@ function App() {
             }).join("") +
             '</div></body></html>';
         var w = window.open("", "_blank");
+        if (!w) { alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してから再度お試しください。"); return; }
         w.document.write(html);
         w.document.close();
         w.focus();
@@ -1057,8 +1082,6 @@ function App() {
                 });
                 return ng;
             });
-        }
-        if (t !== oldName) {
             setAbsent(function(prev) {
                 if (!prev.has(oldName)) return prev;
                 var next = new Set(prev);
@@ -1801,20 +1824,6 @@ function App() {
         color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer",
     };
     var sectionLabel = { fontSize: 12, fontWeight: 700, color: "#718096", marginBottom: 6 };
-    function PeriodBtns(props) {
-        var value = props.value, setter = props.setter, color = props.color, bg = props.bg;
-        return (React.createElement("div", { style: { display: "flex", gap: 6 } }, [["both", "午前＋午後"], ["AM", "午前のみ"], ["PM", "午後のみ"]].map(function (item) {
-            var v = item[0], lbl = item[1];
-            var active = value === v;
-            return (React.createElement("button", { key: v, onClick: function () { setter(v); }, style: {
-                    flex: 1, padding: "7px 4px", borderRadius: 8,
-                    fontSize: 11, fontWeight: 700, cursor: "pointer",
-                    border: "1.5px solid " + (active ? color : "#e0e7ef"),
-                    background: active ? bg : "white",
-                    color: active ? color : "#718096",
-                } }, lbl));
-        })));
-    }
     return (React.createElement("div", { style: { fontFamily: "sans-serif", minHeight: "100vh", background: "#f0f4f8" } },
         personDetailPage !== null && people[personDetailPage] && React.createElement(PersonDetailPage, {
             person: people[personDetailPage],
@@ -1828,6 +1837,21 @@ function App() {
             onRemove: removePerson,
             onSave: handleSave,
         }),
+        showSaveLog && React.createElement("div", { onClick: function(){ setShowSaveLog(false); }, style:{ position:"fixed", inset:0, zIndex:9500, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"flex-end", justifyContent:"center" } },
+            React.createElement("div", { onClick: function(e){ e.stopPropagation(); }, style:{ background:"white", borderRadius:"20px 20px 0 0", padding:"20px 16px 32px", width:"100%", maxWidth:480, maxHeight:"70vh", display:"flex", flexDirection:"column" } },
+                React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 } },
+                    React.createElement("div", { style:{ fontWeight:800, fontSize:16, color:"#1e3a5f" } }, "\uD83D\uDCBE \u4fdd\u5b58\u30ed\u30b0"),
+                    React.createElement("button", { onClick: function(){ setShowSaveLog(false); }, style:{ background:"#f0f4f8", border:"none", borderRadius:8, padding:"6px 14px", fontSize:13, fontWeight:700, cursor:"pointer", color:"#718096" } }, "\u9589\u3058\u308b")),
+                saveLog.length === 0
+                    ? React.createElement("div", { style:{ textAlign:"center", color:"#a0aec0", fontSize:13, padding:"24px 0" } }, "\u307e\u3060\u4fdd\u5b58\u306e\u8a18\u9332\u304c\u3042\u308a\u307e\u305b\u3093")
+                    : React.createElement("div", { style:{ overflowY:"auto", display:"flex", flexDirection:"column", gap:6 } },
+                        saveLog.map(function(ts, i){
+                            return React.createElement("div", { key:i, style:{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background: i===0?"#e3f2fd":"#f8fafc", borderRadius:10, border:"1px solid "+(i===0?"#90caf9":"#e0e7ef") } },
+                                React.createElement("span", { style:{ fontSize:16 } }, i===0?"\uD83D\uDD51":"\u23F3"),
+                                React.createElement("div", { style:{ flex:1 } },
+                                    React.createElement("div", { style:{ fontSize:13, fontWeight: i===0?700:400, color: i===0?"#1565c0":"#4a5568" } }, ts),
+                                    i===0 && React.createElement("div", { style:{ fontSize:10, color:"#64b5f6", marginTop:2 } }, "\u6700\u65b0\u306e\u4fdd\u5b58")));
+                        })))),
         showPeopleListPage && React.createElement(PeopleListPage, {
             people: people,
             absent: absent,
@@ -1863,11 +1887,25 @@ function App() {
             React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 } },
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 } },
                     React.createElement("span", { style: { fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" } }, "\u30C7\u30A4\u30B5\u30FC\u30D3\u30B9 \u9001\u8FCE\u8868"),
-                    React.createElement("button", { onClick: handleSave, style: {
+                    React.createElement("button", {
+                        onClick: handleSave,
+                        onContextMenu: function(e){ e.preventDefault(); setShowSaveLog(true); },
+                        onTouchStart: function(e){
+                            var t = setTimeout(function(){ setShowSaveLog(true); }, 600);
+                            e.currentTarget._lpt = t;
+                        },
+                        onTouchEnd: function(e){
+                            clearTimeout(e.currentTarget._lpt);
+                        },
+                        onTouchMove: function(e){
+                            clearTimeout(e.currentTarget._lpt);
+                        },
+                        style: {
                             padding: "4px 10px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap", marginLeft: 6,
                             background: saveStatus === "ok" ? "#e8f5e9" : saveStatus === "err" ? "#fee2e2" : "rgba(255,255,255,.2)",
                             color: saveStatus === "ok" ? "#2e7d32" : saveStatus === "err" ? "#e53e3e" : "white",
-                        } }, saveStatus === "ok" ? "✓ 保存済" : saveStatus === "err" ? "✗ エラー" : "💾 保存"),
+                        }
+                    }, saveStatus === "ok" ? "\u2713 \u4fdd\u5b58\u6e08" : saveStatus === "err" ? "\u2717 \u30a8\u30e9\u30fc" : "\uD83D\uDCBE \u4fdd\u5b58"),
                     selectedDate && React.createElement("button", { onClick: handlePrint, style: {
                             padding: "4px 10px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
                             background: "rgba(255,255,255,.2)", color: "white",
