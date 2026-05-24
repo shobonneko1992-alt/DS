@@ -50,7 +50,9 @@ function mkGrid() {
         });
     });
 }
-function mkDay() { return { AM: mkGrid(), PM: mkGrid(), drivers: ["", "", "", ""] }; }
+function mkDay() { return { AM: mkGrid(), PM: mkGrid(), "AM_送り": mkGrid(), "PM_送り": mkGrid(), drivers: ["", "", "", ""] }; }
+function gridKey(period, direction) { return direction === "送り" ? period + "_送り" : period; }
+var ALL_GRID_KEYS = ["AM", "PM", "AM_送り", "PM_送り"];
 function toKey(y, m, d) {
     return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
 }
@@ -61,23 +63,25 @@ function getMonMon(d) {
     return mon;
 }
 function cloneGrid(g) {
-    return {
-        AM: (g.AM || []).map(function (c) { return (c || []).map(function (s) { return Object.assign({}, s || {}); }); }),
-        PM: (g.PM || []).map(function (c) { return (c || []).map(function (s) { return Object.assign({}, s || {}); }); }),
-        drivers: g.drivers ? g.drivers.slice() : ["", "", "", ""],
-    };
+    var result = { drivers: g.drivers ? g.drivers.slice() : ["", "", "", ""] };
+    ALL_GRID_KEYS.forEach(function(key) {
+        var src = g[key];
+        if (src) {
+            result[key] = src.map(function(c){ return (c||[]).map(function(s){ return Object.assign({}, s||{}); }); });
+        } else {
+            result[key] = mkGrid();
+        }
+    });
+    return result;
 }
 function clearNameInGrid(g, name) {
-    ["AM", "PM"].forEach(function (per) {
-        if (!g[per]) return;
-        g[per].forEach(function (car) {
+    ALL_GRID_KEYS.forEach(function (key) {
+        if (!g[key]) return;
+        g[key].forEach(function (car) {
             if (!car) return;
             car.forEach(function (seat) {
                 if (seat && seat.name === name) {
-                    seat.name = "";
-                    seat.seatNo = "";
-                    seat.time = "";
-                    seat.color = "";
+                    seat.name = ""; seat.seatNo = ""; seat.time = ""; seat.color = "";
                 }
             });
         });
@@ -105,6 +109,8 @@ var DAY_JP = ["日","月","火","水","木","金","土"];
 var WEEK_SECTIONS = [
     { label: "AM 迎え", period: "AM", dir: "迎え" },
     { label: "PM 迎え", period: "PM", dir: "迎え" },
+    { label: "AM 送り", period: "AM", dir: "送り" },
+    { label: "PM 送り", period: "PM", dir: "送り" },
 ];
 var COLOR_BG_MAP = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
 
@@ -117,13 +123,15 @@ function WeekTable(props) {
     var [weekColorMode, setWeekColorMode] = useState(false);
     var [weekPaintColor, setWeekPaintColor] = useState("");
 
-    function setSeatWeekColor(dateKey, period, ci, si, colorVal) {
+    function setSeatWeekColor(dateKey, per, dir, ci, si, colorVal) {
         if (!setAllGrids) return;
+        var gkey = gridKey(per, dir || "迎え");
         setAllGrids(function(prev) {
             var next = JSON.parse(JSON.stringify(prev));
             if (!next[dateKey]) return prev;
-            if (!next[dateKey][period] || !next[dateKey][period][ci] || !next[dateKey][period][ci][si]) return prev;
-            next[dateKey][period][ci][si].color = colorVal;
+            if (!next[dateKey][gkey]) next[dateKey][gkey] = mkGrid();
+            if (!next[dateKey][gkey][ci] || !next[dateKey][gkey][ci][si]) return prev;
+            next[dateKey][gkey][ci][si].color = colorVal;
             return next;
         });
     }
@@ -214,7 +222,8 @@ function WeekTable(props) {
                 var seatRowsHtml = Array(SEAT_COUNT).fill(null).map(function(_, si) {
                     var cells = weekDates.map(function(wd) {
                         var dayGrid = allGrids[wd.key];
-                        var seat = dayGrid && dayGrid[sec.period] && dayGrid[sec.period][ci] && dayGrid[sec.period][ci][si];
+                        var secGk = gridKey(sec.period, sec.dir);
+                        var seat = dayGrid && dayGrid[secGk] && dayGrid[secGk][ci] && dayGrid[secGk][ci][si];
                         var name = seat ? seat.name : "";
                         var time = seat ? seat.time : "";
                         var seatNo = seat ? seat.seatNo : "";
@@ -227,9 +236,10 @@ function WeekTable(props) {
                 }).join("");
                 var totalCells = weekDates.map(function(wd) {
                     var dayGrid = allGrids[wd.key];
+                    var secGk2 = gridKey(sec.period, sec.dir);
                     var count = 0;
-                    if (dayGrid && dayGrid[sec.period] && dayGrid[sec.period][ci]) {
-                        dayGrid[sec.period][ci].forEach(function(s) { if (s && s.name) count++; });
+                    if (dayGrid && dayGrid[secGk2] && dayGrid[secGk2][ci]) {
+                        dayGrid[secGk2][ci].forEach(function(s) { if (s && s.name) count++; });
                     }
                     return '<td style="background:#f0f4f8;font-size:10px;font-weight:bold;padding:2px 4px;border:1px solid #c0ccda;text-align:center;color:' + (count > 0 ? "#1e3a5f" : "#aaa") + ';">' + count + '名</td>';
                 }).join("");
@@ -393,7 +403,8 @@ function WeekTable(props) {
                         }
                         var dateCells = weekDates.map(function(wd) {
                             var dayGrid = allGrids[wd.key];
-                            var seat = dayGrid && dayGrid[sec.period] && dayGrid[sec.period][ci] && dayGrid[sec.period][ci][si];
+                            var rGk = gridKey(sec.period, sec.dir);
+                            var seat = dayGrid && dayGrid[rGk] && dayGrid[rGk][ci] && dayGrid[rGk][ci][si];
                             var name = seat ? seat.name : "";
                             var time = seat ? seat.time : "";
                             var seatNo = seat ? seat.seatNo : "";
@@ -403,7 +414,7 @@ function WeekTable(props) {
                             var nameFontSize = surname.length >= 4 ? 9 : surname.length === 3 ? 10 : 11;
                             var canPaint = weekColorMode && !!name;
                             return React.createElement("td", { key: wd.key,
-                                onClick: canPaint ? function() { setSeatWeekColor(wd.key, sec.period, ci, si, weekPaintColor); } : undefined,
+                                onClick: canPaint ? function() { setSeatWeekColor(wd.key, sec.period, sec.dir, ci, si, weekPaintColor); } : undefined,
                                 style: {
                                 background: bg, padding: "2px 1px",
                                 border: canPaint ? "1.5px solid #1e3a5f" : "1px solid #e0e7ef",
@@ -442,10 +453,12 @@ function WeekTable(props) {
                     } }, "合計"),
                     weekDates.map(function(wd) {
                         var dayGrid = allGrids[wd.key];
+                        var tGk = gridKey(sec.period, sec.dir);
                         var total = 0;
-                        if (dayGrid && dayGrid[sec.period]) {
-                            dayGrid[sec.period].forEach(function(car) {
-                                car.forEach(function(s) { if (s.name) total++; });
+                        if (dayGrid && dayGrid[tGk]) {
+                            dayGrid[tGk].forEach(function(car) {
+                                if (!car) return;
+                                car.forEach(function(s) { if (s && s.name) total++; });
                             });
                         }
                         return React.createElement("td", { key: wd.key, style: {
@@ -829,9 +842,19 @@ function App() {
             var v = localStorage.getItem(key);
             if (v) {
                 var parsed = JSON.parse(v);
-                // people配列はdays/periodsフィールドを必ず補完
                 if (key === "ds_people" && Array.isArray(parsed)) {
                     return parsed.map(function(p) { return Object.assign({ days: [], periods: [], kana: "" }, p); });
+                }
+                if (key === "ds_grids" && parsed && typeof parsed === "object") {
+                    Object.keys(parsed).forEach(function(dateKey) {
+                        var g = parsed[dateKey];
+                        if (g) {
+                            if (!g["AM_送り"]) g["AM_送り"] = mkGrid();
+                            if (!g["PM_送り"]) g["PM_送り"] = mkGrid();
+                            if (!g["AM"]) g["AM"] = mkGrid();
+                            if (!g["PM"]) g["PM"] = mkGrid();
+                        }
+                    });
                 }
                 return parsed;
             }
@@ -841,6 +864,17 @@ function App() {
                     var av = _saved[autoKey];
                     if (key === "ds_people" && Array.isArray(av)) {
                         return av.map(function(p) { return Object.assign({ days: [], periods: [], kana: "" }, p); });
+                    }
+                    if (key === "ds_grids" && av && typeof av === "object") {
+                        Object.keys(av).forEach(function(dateKey) {
+                            var g = av[dateKey];
+                            if (g) {
+                                if (!g["AM_送り"]) g["AM_送り"] = mkGrid();
+                                if (!g["PM_送り"]) g["PM_送り"] = mkGrid();
+                                if (!g["AM"]) g["AM"] = mkGrid();
+                                if (!g["PM"]) g["PM"] = mkGrid();
+                            }
+                        });
                     }
                     return av;
                 }
@@ -1014,15 +1048,17 @@ function App() {
         if (!selectedDate || !grid) return;
         handlePrintSection("both");
     }
-    function handlePrintSection(mode) {
+    function handlePrintSection(mode, dir) {
         if (!selectedDate || !grid) return;
+        var dirLabel = dir === "送り" ? "送り" : "迎え";
         var colorBgMap = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
         var dayDrivers = (allGrids[selectedDate] && allGrids[selectedDate].drivers) ? allGrids[selectedDate].drivers : ["","","",""];
         var sections = mode === "AM"
-            ? [{ label: "AM 迎え", data: grid.AM }]
+            ? [{ label: "AM " + dirLabel, data: grid[gridKey("AM", dir || "迎え")] || mkGrid() }]
             : mode === "PM"
-            ? [{ label: "PM 迎え", data: grid.PM }]
-            : [{ label: "AM 迎え", data: grid.AM }, { label: "PM 迎え", data: grid.PM }];
+            ? [{ label: "PM " + dirLabel, data: grid[gridKey("PM", dir || "迎え")] || mkGrid() }]
+            : [{ label: "AM " + dirLabel, data: grid[gridKey("AM", dir || "迎え")] || mkGrid() },
+               { label: "PM " + dirLabel, data: grid[gridKey("PM", dir || "迎え")] || mkGrid() }];
         var carsHtml = carNames.map(function(cname, ci) {
             return '<div class="car-block">' +
                 sections.map(function(sec) {
@@ -1060,7 +1096,7 @@ function App() {
             'td{padding:2px 4px;border-bottom:1px solid #f0f0f0;font-size:10px;}' +
             '@media print{body{margin:5px;}}' +
             '</style></head><body>' +
-            '<h1>デイサービス送迎表　' + selectedDate + '　' + (mode === "AM" ? "AM迎え" : mode === "PM" ? "PM迎え" : "AM・PM迎え") + '</h1>' +
+            '<h1>デイサービス送迎表　' + selectedDate + '　' + (mode === "AM" ? "AM" : mode === "PM" ? "PM" : "AM・PM") + dirLabel + '</h1>' +
             '<div class="grid">' +
             carNames.map(function(cname, ci) {
                 var drv = dayDrivers[ci] || "";
@@ -1092,31 +1128,32 @@ function App() {
         setTimeout(function() { w.print(); }, 400);
     }
     var grid = selectedDate ? (allGrids[selectedDate] || mkDay()) : null;
+    var gk = gridKey(period, direction);
     var assigned = useMemo(function () {
         var s = new Set();
         if (!grid) return s;
-        grid[period].forEach(function (car) {
+        (grid[gk] || []).forEach(function (car) {
             if (!car) return;
             car.forEach(function (seat) { if (seat && seat.name) s.add(seat.name); });
         });
         return s;
-    }, [allGrids, selectedDate, period]);
+    }, [allGrids, selectedDate, period, direction]);
     var dups = useMemo(function () {
         var c = {};
         if (!grid) return new Set();
-        grid[period].forEach(function (car) {
+        (grid[gk] || []).forEach(function (car) {
             if (!car) return;
             car.forEach(function (seat) {
                 if (seat && seat.name) c[seat.name] = (c[seat.name] || 0) + 1;
             });
         });
         return new Set(Object.keys(c).filter(function (k) { return c[k] > 1; }));
-    }, [allGrids, selectedDate, period]);
+    }, [allGrids, selectedDate, period, direction]);
     var dupDetails = useMemo(function () {
         if (!grid || dups.size === 0) return [];
         return Array.from(dups).map(function (name) {
             var locations = [];
-            grid[period].forEach(function (car, ci) {
+            (grid[gk] || []).forEach(function (car, ci) {
                 if (!car) return;
                 car.forEach(function (seat) {
                     if (seat && seat.name === name) locations.push(carNames[ci]);
@@ -1124,7 +1161,7 @@ function App() {
             });
             return { name: name, cars: locations };
         });
-    }, [allGrids, selectedDate, period, dups, carNames]);
+    }, [allGrids, selectedDate, period, direction, dups, carNames]);
     function updateGrid(updater) {
         setAllGrids(function (prev) {
             var cur = prev[selectedDate] || mkDay();
@@ -1136,19 +1173,18 @@ function App() {
         });
     }
     function assign(ci, si, name) {
+        var gk = gridKey(period, direction);
         updateGrid(function (g) {
-            g[period][ci][si].name = name;
-            if (!name) {
-                g[period][ci][si].seatNo = "";
-                g[period][ci][si].time = "";
-            }
+            if (!g[gk]) g[gk] = mkGrid();
+            g[gk][ci][si].name = name;
+            if (!name) { g[gk][ci][si].seatNo = ""; g[gk][ci][si].time = ""; }
         });
         setOpenKey(null);
         setSearch("");
     }
-    function setSeatNo(ci, si, v) { updateGrid(function (g) { g[period][ci][si].seatNo = v; }); }
-    function setTime(ci, si, v) { updateGrid(function (g) { g[period][ci][si].time = v; }); }
-    function setSeatColor(ci, si, v) { updateGrid(function (g) { g[period][ci][si].color = v; }); }
+    function setSeatNo(ci, si, v) { var gk = gridKey(period, direction); updateGrid(function (g) { if (!g[gk]) g[gk]=mkGrid(); g[gk][ci][si].seatNo = v; }); }
+    function setTime(ci, si, v) { var gk = gridKey(period, direction); updateGrid(function (g) { if (!g[gk]) g[gk]=mkGrid(); g[gk][ci][si].time = v; }); }
+    function setSeatColor(ci, si, v) { var gk = gridKey(period, direction); updateGrid(function (g) { if (!g[gk]) g[gk]=mkGrid(); g[gk][ci][si].color = v; }); }
     function toggleAbsent(name) {
         setAbsent(function (prev) {
             var next = new Set(prev);
@@ -1189,10 +1225,13 @@ function App() {
                 var ng = Object.assign({}, g);
                 Object.keys(ng).forEach(function (k) {
                     ng[k] = cloneGrid(g[k]);
-                    ["AM", "PM"].forEach(function (per) {
-                        ng[k][per].forEach(function (car) {
-                            car.forEach(function (seat) { if (seat.name === oldName)
-                                seat.name = t; });
+                    ALL_GRID_KEYS.forEach(function (gkey) {
+                        if (!ng[k][gkey]) return;
+                        ng[k][gkey].forEach(function (car) {
+                            if (!car) return;
+                            car.forEach(function (seat) {
+                                if (seat && seat.name === oldName) seat.name = t;
+                            });
                         });
                     });
                 });
@@ -1326,8 +1365,7 @@ function App() {
         return weeks;
     }, [viewYear, viewMonth]);
     function applyWeekCopy() {
-        if (!weekCopySource || weekCopyTargets.length === 0)
-            return;
+        if (!weekCopySource || weekCopyTargets.length === 0) return;
         setAllGrids(function (prev) {
             var next = Object.assign({}, prev);
             weekCopyTargets.forEach(function (targetMon) {
@@ -1340,16 +1378,12 @@ function App() {
                     var tgtKey = toKey(tgtDate.getFullYear(), tgtDate.getMonth(), tgtDate.getDate());
                     var srcGrid = prev[srcKey] || mkDay();
                     var updated = cloneGrid(next[tgtKey] || mkDay());
-                    if (weekCopyPeriod === "AM" || weekCopyPeriod === "both") {
-                        updated.AM = srcGrid.AM.map(function (c) {
-                            return c.map(function (s) { return Object.assign({}, s); });
-                        });
-                    }
-                    if (weekCopyPeriod === "PM" || weekCopyPeriod === "both") {
-                        updated.PM = srcGrid.PM.map(function (c) {
-                            return c.map(function (s) { return Object.assign({}, s); });
-                        });
-                    }
+                    var copyKeys = weekCopyPeriod === "AM" ? ["AM","AM_送り"]
+                                 : weekCopyPeriod === "PM" ? ["PM","PM_送り"]
+                                 : ALL_GRID_KEYS;
+                    copyKeys.forEach(function(k) {
+                        updated[k] = (srcGrid[k] || mkGrid()).map(function(c){ return (c||[]).map(function(s){ return Object.assign({},s||{}); }); });
+                    });
                     next[tgtKey] = updated;
                 }
             });
@@ -1369,23 +1403,18 @@ function App() {
         });
     }, [allGrids]);
     function applyDayCopy() {
-        if (!dayCopySource || dayCopyTargets.length === 0)
-            return;
+        if (!dayCopySource || dayCopyTargets.length === 0) return;
         setAllGrids(function (prev) {
             var next = Object.assign({}, prev);
             var srcGrid = prev[dayCopySource] || mkDay();
             dayCopyTargets.forEach(function (tgtKey) {
                 var updated = cloneGrid(next[tgtKey] || mkDay());
-                if (dayCopyPeriod === "AM" || dayCopyPeriod === "both") {
-                    updated.AM = srcGrid.AM.map(function (c) {
-                        return c.map(function (s) { return Object.assign({}, s); });
-                    });
-                }
-                if (dayCopyPeriod === "PM" || dayCopyPeriod === "both") {
-                    updated.PM = srcGrid.PM.map(function (c) {
-                        return c.map(function (s) { return Object.assign({}, s); });
-                    });
-                }
+                var copyKeys = dayCopyPeriod === "AM" ? ["AM","AM_送り"]
+                             : dayCopyPeriod === "PM" ? ["PM","PM_送り"]
+                             : ALL_GRID_KEYS;
+                copyKeys.forEach(function(k) {
+                    updated[k] = (srcGrid[k] || mkGrid()).map(function(c){ return (c||[]).map(function(s){ return Object.assign({},s||{}); }); });
+                });
                 next[tgtKey] = updated;
             });
             return next;
@@ -1423,9 +1452,9 @@ function App() {
         var counts = {};
         people.forEach(function (p) { counts[p.name] = 0; });
         Object.values(allGrids).forEach(function (g) {
-            ["AM", "PM"].forEach(function (per) {
-                if (!g[per]) return;
-                g[per].forEach(function (car) {
+            ALL_GRID_KEYS.forEach(function (key) {
+                if (!g[key]) return;
+                g[key].forEach(function (car) {
                     if (!car) return;
                     car.forEach(function (seat) {
                         if (seat && seat.name && counts[seat.name] !== undefined)
@@ -1458,11 +1487,6 @@ function App() {
                 return ka.localeCompare(kb, "ja");
             });
         }
-        else if (peopleSort === "usage") {
-            list.sort(function (a, b) {
-                return (usageCount[b.name] || 0) - (usageCount[a.name] || 0);
-            });
-        }
         return list;
     }, [people, peopleSort, usageCount, selectedDayIdx, period, selectedDate]);
     var calDays = useMemo(function () {
@@ -1492,16 +1516,20 @@ function App() {
         var g = allGrids[toKey(viewYear, viewMonth, d)];
         if (!g) return null;
         var am = new Set(), pm = new Set();
-        if (g.AM) g.AM.forEach(function (car) { if (!car) return; car.forEach(function (s) {
-            if (!s || !s.name) return;
-            var p = people.find(function(pp) { return pp.name === s.name; });
-            if (!p || !p.periods || p.periods.length === 0 || p.periods.indexOf("AM") >= 0) am.add(s.name);
-        }); });
-        if (g.PM) g.PM.forEach(function (car) { if (!car) return; car.forEach(function (s) {
-            if (!s || !s.name) return;
-            var p = people.find(function(pp) { return pp.name === s.name; });
-            if (!p || !p.periods || p.periods.length === 0 || p.periods.indexOf("PM") >= 0) pm.add(s.name);
-        }); });
+        (["AM", "AM_送り"]).forEach(function(key){
+            if (!g[key]) return;
+            g[key].forEach(function (car) { if (!car) return; car.forEach(function (s) {
+                if (!s || !s.name) return;
+                am.add(s.name);
+            }); });
+        });
+        (["PM", "PM_送り"]).forEach(function(key){
+            if (!g[key]) return;
+            g[key].forEach(function (car) { if (!car) return; car.forEach(function (s) {
+                if (!s || !s.name) return;
+                pm.add(s.name);
+            }); });
+        });
         if (am.size === 0 && pm.size === 0) return null;
         return { am: am.size, pm: pm.size };
     }
@@ -1735,8 +1763,8 @@ function App() {
     }
     function hasGridData(g) {
         if (!g) return false;
-        return ["AM","PM"].some(function(per){
-            return g[per] && g[per].some(function(car){ return car && car.some(function(s){ return s && !!s.name; }); });
+        return ALL_GRID_KEYS.some(function(key){
+            return g[key] && g[key].some(function(car){ return car && car.some(function(s){ return s && !!s.name; }); });
         });
     }
     function getGridDayText(dateKey) {
@@ -1775,6 +1803,14 @@ function App() {
         }};
         return JSON.stringify(data);
     }
+    function fillGridKeys(g) {
+        if (!g) return g;
+        if (!g["AM"]) g["AM"] = mkGrid();
+        if (!g["PM"]) g["PM"] = mkGrid();
+        if (!g["AM_送り"]) g["AM_送り"] = mkGrid();
+        if (!g["PM_送り"]) g["PM_送り"] = mkGrid();
+        return g;
+    }
     function handleReceiveData() {
         setReceiveError("");
         setReceiveSuccess(false);
@@ -1808,6 +1844,7 @@ function App() {
             // グリッドデータ形式（日）
             if (data.type === "dscar_grid_day_v1" && data.date) {
                 if (data.grid) {
+                    fillGridKeys(data.grid);
                     setAllGrids(function(prev) {
                         var next = Object.assign({}, prev);
                         next[data.date] = data.grid;
@@ -1820,7 +1857,7 @@ function App() {
             if (data.type === "dscar_grid_week_v1" && data.grids) {
                 setAllGrids(function(prev) {
                     var next = Object.assign({}, prev);
-                    Object.keys(data.grids).forEach(function(k){ next[k] = data.grids[k]; });
+                    Object.keys(data.grids).forEach(function(k){ next[k] = fillGridKeys(data.grids[k]); });
                     return next;
                 });
                 setReceiveSuccess(true); setReceiveText(""); return;
@@ -1829,7 +1866,7 @@ function App() {
             if (data.type === "dscar_grid_month_v1" && data.grids) {
                 setAllGrids(function(prev) {
                     var next = Object.assign({}, prev);
-                    Object.keys(data.grids).forEach(function(k){ next[k] = data.grids[k]; });
+                    Object.keys(data.grids).forEach(function(k){ next[k] = fillGridKeys(data.grids[k]); });
                     return next;
                 });
                 setReceiveSuccess(true); setReceiveText(""); return;
@@ -1934,14 +1971,14 @@ function App() {
         return { ci: parseInt(parts[0], 10), si: parseInt(parts[1], 10) };
     }
     function doSwapSeats(srcKey, dstKey) {
-        if (!srcKey || !dstKey || srcKey === dstKey)
-            return;
+        if (!srcKey || !dstKey || srcKey === dstKey) return;
         var src = parseSeatKey(srcKey);
         var dst = parseSeatKey(dstKey);
         updateGrid(function (g) {
-            var tmp = Object.assign({}, g[period][src.ci][src.si]);
-            g[period][src.ci][src.si] = Object.assign({}, g[period][dst.ci][dst.si]);
-            g[period][dst.ci][dst.si] = tmp;
+            if (!g[gk]) g[gk] = mkGrid();
+            var tmp = Object.assign({}, g[gk][src.ci][src.si]);
+            g[gk][src.ci][src.si] = Object.assign({}, g[gk][dst.ci][dst.si]);
+            g[gk][dst.ci][dst.si] = tmp;
         });
     }
     function handleSeatDragStart(ci, si) {
@@ -2370,27 +2407,8 @@ function App() {
                     var g = allGrids[key];
                     var amSet = new Set(), pmSet = new Set();
                     if (g) {
-                        var dow2 = d.getDay();
-                        var dowMap2 = {1:0,2:1,3:2,4:3,5:4};
-                        var dayIdx2 = dowMap2[dow2] !== undefined ? dowMap2[dow2] : null;
-                        if (g.AM) g.AM.forEach(function (car) { if(!car) return; car.forEach(function (s) {
-                            if (!s || !s.name) return;
-                            var p = people.find(function(pp) { return pp.name === s.name; });
-                            if (!p) return;
-                            var inAM = p.dayPeriodsEnabled && p.dayPeriods && dayIdx2 !== null
-                                ? p.dayPeriods[dayIdx2] === "AM"
-                                : (!p.periods || p.periods.length === 0 || p.periods.indexOf("AM") >= 0);
-                            if (inAM) amSet.add(s.name);
-                        }); });
-                        if (g.PM) g.PM.forEach(function (car) { if(!car) return; car.forEach(function (s) {
-                            if (!s || !s.name) return;
-                            var p = people.find(function(pp) { return pp.name === s.name; });
-                            if (!p) return;
-                            var inPM = p.dayPeriodsEnabled && p.dayPeriods && dayIdx2 !== null
-                                ? p.dayPeriods[dayIdx2] === "PM"
-                                : (!p.periods || p.periods.length === 0 || p.periods.indexOf("PM") >= 0);
-                            if (inPM) pmSet.add(s.name);
-                        }); });
+                        (["AM","AM_送り"]).forEach(function(gkey){ if(!g[gkey]) return; g[gkey].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) amSet.add(s.name); }); }); });
+                        (["PM","PM_送り"]).forEach(function(gkey){ if(!g[gkey]) return; g[gkey].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) pmSet.add(s.name); }); }); });
                     }
                     var summary = (amSet.size || pmSet.size) ? { am: amSet.size, pm: pmSet.size } : null;
                     var isToday = d.toDateString() === today.toDateString();
@@ -2422,10 +2440,11 @@ function App() {
                                 ")")),
                         dayIsToday && React.createElement("div", { style: { fontSize: 11, color: "#2d6a9f", fontWeight: 700, marginTop: 2 } }, "\u4ECA\u65E5")),
                     ["AM", "PM"].map(function (per) {
-                        var perGrid = dayGrid ? dayGrid[per] : null;
+                        var perGrid = dayGrid ? (dayGrid[per] || null) : null;
+                        var perGridSend = dayGrid ? (dayGrid[per + "_送り"] || null) : null;
                         var countSet = new Set();
-                        if (perGrid)
-                            perGrid.forEach(function (car) { if (!car) return; car.forEach(function (s) { if (s && s.name) countSet.add(s.name); }); });
+                        if (perGrid) perGrid.forEach(function (car) { if (!car) return; car.forEach(function (s) { if (s && s.name) countSet.add(s.name); }); });
+                        if (perGridSend) perGridSend.forEach(function (car) { if (!car) return; car.forEach(function (s) { if (s && s.name) countSet.add(s.name); }); });
                         return (React.createElement("div", { key: per, style: {
                                 marginBottom: 10, borderRadius: 10, padding: "10px 12px",
                                 background: per === "AM" ? "#fffef0" : "#f0f7ff",
@@ -2439,8 +2458,8 @@ function App() {
                                     MAX,
                                     "\u540D")),
                             perGrid ? (React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 } }, carNames.map(function (cname, ci) {
-                                var seats = perGrid[ci];
-                                var filled = seats.filter(function (s) { return s.name; });
+                                var seats = perGrid[ci] || [];
+                                var filled = seats.filter(function (s) { return s && s.name; });
                                 return (React.createElement("div", { key: ci, style: { background: "white", borderRadius: 8, padding: "6px 8px", border: "1px solid #e0e7ef" } },
                                     React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#1e3a5f", marginBottom: 4 } },
                                         "\uD83D\uDE99 ",
@@ -2729,16 +2748,26 @@ function App() {
                                     boxShadow: "0 4px 16px rgba(0,0,0,.12)", zIndex: 200,
                                     overflow: "hidden", minWidth: 130,
                                 } },
-                                    React.createElement("button", { onClick: function() { handlePrintSection("AM"); setShowDayPrintMenu(false); }, style: {
+                                    React.createElement("button", { onClick: function() { handlePrintSection("AM", "迎え"); setShowDayPrintMenu(false); }, style: {
                                         display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
                                         background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
                                         fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
                                     } }, "🌅 AM 迎え"),
-                                    React.createElement("button", { onClick: function() { handlePrintSection("PM"); setShowDayPrintMenu(false); }, style: {
+                                    React.createElement("button", { onClick: function() { handlePrintSection("AM", "送り"); setShowDayPrintMenu(false); }, style: {
+                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                        background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                                        fontSize: 12, fontWeight: 700, color: "#7c3aed", cursor: "pointer",
+                                    } }, "🌅 AM 送り"),
+                                    React.createElement("button", { onClick: function() { handlePrintSection("PM", "迎え"); setShowDayPrintMenu(false); }, style: {
+                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                        background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                                    } }, "🌇 PM 迎え"),
+                                    React.createElement("button", { onClick: function() { handlePrintSection("PM", "送り"); setShowDayPrintMenu(false); }, style: {
                                         display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
                                         background: "white", border: "none",
-                                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
-                                    } }, "🌇 PM 迎え"))),
+                                        fontSize: 12, fontWeight: 700, color: "#7c3aed", cursor: "pointer",
+                                    } }, "🌇 PM 送り"))),
                             dups.size > 0 && (React.createElement("div", { style: { background: "#fff3e0", border: "1.5px solid #ffb74d", borderRadius: 8, padding: "3px 8px", fontSize: 11, color: "#e65100", fontWeight: 600 } }, "\u26A0\uFE0F \u91CD\u8907")))),
                     dupDetails.length > 0 && (React.createElement("div", { style: { marginBottom: 8, background: "#fff3e0", border: "2px solid #ffb74d", borderRadius: 10, padding: "10px 14px" } },
                         React.createElement("div", { style: { fontWeight: 800, fontSize: 13, color: "#e65100", marginBottom: 6 } },
@@ -2752,10 +2781,11 @@ function App() {
                                 React.createElement("span", { style: { color: "#e65100", fontWeight: 600 } }, d.cars.join("・"))));
                         }))),
                     React.createElement("div", { ref: seatGridRef, onTouchMove: (moveMode || quickDragMode) ? handleSeatTouchMove : undefined, onTouchEnd: (moveMode || quickDragMode) ? handleSeatTouchEnd : undefined, style: { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 } }, carNames.map(function (carName, ci) {
-                        var seats = (allGrids[selectedDate] || mkDay())[period][ci];
-                        var count = seats.filter(function (s) { return s.name; }).length;
+                        var dayData = allGrids[selectedDate] || mkDay();
+                        var seats = (dayData[gk] || dayData["AM"] || mkGrid())[ci] || [];
+                        var count = seats.filter(function (s) { return s && s.name; }).length;
                         var memoPass = seats
-                            .filter(function (s) { return s.name; })
+                            .filter(function (s) { return s && s.name; })
                             .map(function (s) {
                             var personMemo = "";
                             for (var pi = 0; pi < people.length; pi++) {
