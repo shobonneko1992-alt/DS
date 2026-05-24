@@ -1516,20 +1516,8 @@ function App() {
         var g = allGrids[toKey(viewYear, viewMonth, d)];
         if (!g) return null;
         var am = new Set(), pm = new Set();
-        (["AM", "AM_送り"]).forEach(function(key){
-            if (!g[key]) return;
-            g[key].forEach(function (car) { if (!car) return; car.forEach(function (s) {
-                if (!s || !s.name) return;
-                am.add(s.name);
-            }); });
-        });
-        (["PM", "PM_送り"]).forEach(function(key){
-            if (!g[key]) return;
-            g[key].forEach(function (car) { if (!car) return; car.forEach(function (s) {
-                if (!s || !s.name) return;
-                pm.add(s.name);
-            }); });
-        });
+        if (g["AM"]) g["AM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) am.add(s.name); }); });
+        if (g["PM"]) g["PM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) pm.add(s.name); }); });
         if (am.size === 0 && pm.size === 0) return null;
         return { am: am.size, pm: pm.size };
     }
@@ -2407,8 +2395,8 @@ function App() {
                     var g = allGrids[key];
                     var amSet = new Set(), pmSet = new Set();
                     if (g) {
-                        (["AM","AM_送り"]).forEach(function(gkey){ if(!g[gkey]) return; g[gkey].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) amSet.add(s.name); }); }); });
-                        (["PM","PM_送り"]).forEach(function(gkey){ if(!g[gkey]) return; g[gkey].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) pmSet.add(s.name); }); }); });
+                        if (g["AM"]) g["AM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) amSet.add(s.name); }); });
+                        if (g["PM"]) g["PM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) pmSet.add(s.name); }); });
                     }
                     var summary = (amSet.size || pmSet.size) ? { am: amSet.size, pm: pmSet.size } : null;
                     var isToday = d.toDateString() === today.toDateString();
@@ -2441,10 +2429,8 @@ function App() {
                         dayIsToday && React.createElement("div", { style: { fontSize: 11, color: "#2d6a9f", fontWeight: 700, marginTop: 2 } }, "\u4ECA\u65E5")),
                     ["AM", "PM"].map(function (per) {
                         var perGrid = dayGrid ? (dayGrid[per] || null) : null;
-                        var perGridSend = dayGrid ? (dayGrid[per + "_送り"] || null) : null;
                         var countSet = new Set();
                         if (perGrid) perGrid.forEach(function (car) { if (!car) return; car.forEach(function (s) { if (s && s.name) countSet.add(s.name); }); });
-                        if (perGridSend) perGridSend.forEach(function (car) { if (!car) return; car.forEach(function (s) { if (s && s.name) countSet.add(s.name); }); });
                         return (React.createElement("div", { key: per, style: {
                                 marginBottom: 10, borderRadius: 10, padding: "10px 12px",
                                 background: per === "AM" ? "#fffef0" : "#f0f7ff",
