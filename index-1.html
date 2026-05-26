@@ -1126,7 +1126,7 @@ function App() {
         var carsHtml = carNames.map(function(cname, ci){ return buildCarTable(cname, ci); }).join("");
         var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>送迎日報</title>' +
             '<style>' +
-            'body{font-family:"MS Gothic",sans-serif;margin:12px;font-size:11px;}' +
+            'body{font-family:"Meiryo","MS PGothic","Hiragino Kaku Gothic ProN",sans-serif;margin:12px;font-size:11px;}' +
             'h1{font-size:15px;font-weight:bold;margin:0 0 6px;}' +
             'h2{font-size:12px;font-weight:bold;margin:0 0 8px;border-bottom:1px solid #999;padding-bottom:2px;}' +
             '@media print{body{margin:6px;}}' +
@@ -1170,8 +1170,8 @@ function App() {
             var circ = CIRC[i] || (i+1);
             rows += '<tr style="background:' + bg + ';height:24px;">' +
                 '<td style="' + B + 'padding:1px 1px;font-size:10px;">&nbsp;</td>' +
-                '<td style="' + BL + 'padding:1px 4px;font-size:13px;text-align:center;font-weight:bold;">' + nm + '</td>' +
-                '<td style="' + Bn + 'padding:1px 0px 1px 0px;font-size:13px;text-align:left;">様</td>' +
+                '<td style="' + BL + 'padding:1px 4px;font-size:13px;text-align:center;font-weight:bold;letter-spacing:0.3em;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">様</td>' +
                 '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:13px;text-align:left;">' + hh + '</td>' +
                 '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">:</td>' +
                 '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">' + mm + '</td>' +
@@ -1252,8 +1252,8 @@ function App() {
             var circ = CIRC[i] || (i+1);
             pmRows += '<tr style="background:' + bg + ';height:24px;">' +
                 '<td style="' + B + 'padding:1px 2px;font-size:10px;">&nbsp;</td>' +
-                '<td style="' + BL + 'padding:1px 3px;font-size:13px;text-align:center;font-weight:bold;">' + nm + '</td>' +
-                '<td style="' + Bn + 'padding:1px 0px 1px 0px;font-size:13px;text-align:left;">様</td>' +
+                '<td style="' + BL + 'padding:1px 3px;font-size:13px;text-align:center;font-weight:bold;letter-spacing:0.3em;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">様</td>' +
                 '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:13px;text-align:left;">' + hh + '</td>' +
                 '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">:</td>' +
                 '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">' + mm + '</td>' +
