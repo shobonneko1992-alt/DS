@@ -1110,8 +1110,8 @@ function App() {
                 '<td style="' + B + 'font-size:11px;padding:3px 6px;">店発着</td><td colspan="4" style="' + B + 'padding:2px;min-height:30px;">&nbsp;</td>' +
                 '<td style="' + B + 'font-size:11px;padding:3px 6px;">店発着</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
                 '</tr>' +
-                '<tr>' +
-                '<td style="' + B + 'font-size:11px;padding:3px 6px;">運転</td><td colspan="4" style="' + B + 'font-size:11px;padding:3px 6px;">' + drv + '</td>' +
+                '<tr style="text-align:center;">' +
+                '<td style="' + B + 'font-size:11px;padding:3px 6px;">運転</td><td colspan="4" style="' + B + 'font-size:13px;padding:3px 6px;text-align:center;">' + drv + '</td>' +
                 '<td style="' + B + 'font-size:11px;padding:3px 6px;">運転</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
                 '</tr>' +
                 '<tr>' +
@@ -1168,13 +1168,13 @@ function App() {
             var hh = tp[0] || ""; var mm = tp[1] || "";
             var bg = colorBgMap[seat.color || ""] || "#fff";
             var circ = CIRC[i] || (i+1);
-            rows += '<tr style="background:' + bg + ';height:22px;">' +
+            rows += '<tr style="background:' + bg + ';height:24px;">' +
                 '<td style="' + B + 'padding:1px 1px;font-size:10px;">&nbsp;</td>' +
-                '<td style="' + BL + 'padding:1px 4px;font-size:10px;text-align:center;font-weight:bold;">' + nm + '</td>' +
-                '<td style="' + Bn + 'padding:1px 2px;font-size:10px;">様</td>' +
-                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + hh + '</td>' +
-                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">:</td>' +
-                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + mm + '</td>' +
+                '<td style="' + BL + 'padding:1px 4px;font-size:13px;text-align:center;font-weight:bold;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 0px;font-size:13px;text-align:left;">様</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:13px;text-align:left;">' + hh + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">:</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">' + mm + '</td>' +
                 '<td style="' + Bc + 'background:#fff;padding:1px 1px;font-size:10px;">' + circ + '</td>' +
                 '<td style="' + BnR + 'background:#fff;padding:1px 1px;font-size:10px;">:</td>' +
                 '</tr>';
@@ -1203,9 +1203,9 @@ function App() {
             '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">店発着</td>' +
             '<td style="' + B + 'padding:1px;">&nbsp;</td>' +
             '</tr>' +
-            '<tr style="height:22px;">' +
+            '<tr style="height:22px;text-align:center;">' +
             '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">運転</td>' +
-            '<td colspan="5" style="' + B + 'font-size:10px;padding:1px 4px;">' + drv + '</td>' +
+            '<td colspan="5" style="' + B + 'font-size:13px;padding:1px 4px;text-align:center;">' + drv + '</td>' +
             '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">運転</td>' +
             '<td style="' + B + 'padding:1px;">&nbsp;</td>' +
             '</tr>' +
@@ -1224,7 +1224,7 @@ function App() {
         var drv = dayDrivers[ci] || "";
         // ドライバー一覧を横並びで表示（◯を書き込めるスペース付き）
         var drvRow = (driverList && driverList.length > 0)
-            ? driverList.map(function(d) { return d; }).join('&nbsp;&nbsp;')
+            ? driverList.map(function(d) { return d; }).join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;')
             : (drv || '&nbsp;');
         var sections = [
             { gk: gridKey("AM","迎え"), label: "お迎え" },
@@ -1250,13 +1250,13 @@ function App() {
             var hh = tp[0] || ""; var mm = tp[1] || "";
             var bg = colorBgMap[seat.color || ""] || "#fff";
             var circ = CIRC[i] || (i+1);
-            pmRows += '<tr style="background:' + bg + ';height:22px;">' +
+            pmRows += '<tr style="background:' + bg + ';height:24px;">' +
                 '<td style="' + B + 'padding:1px 2px;font-size:10px;">&nbsp;</td>' +
-                '<td style="' + BL + 'padding:1px 3px;font-size:10px;text-align:center;font-weight:bold;">' + nm + '</td>' +
-                '<td style="' + Bn + 'padding:1px 2px;font-size:10px;">様</td>' +
-                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + hh + '</td>' +
-                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">:</td>' +
-                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + mm + '</td>' +
+                '<td style="' + BL + 'padding:1px 3px;font-size:13px;text-align:center;font-weight:bold;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 0px;font-size:13px;text-align:left;">様</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:13px;text-align:left;">' + hh + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">:</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">' + mm + '</td>' +
                 '<td style="' + Bc + 'background:#fff;padding:1px 2px;font-size:10px;">' + circ + '</td>' +
                 '<td style="' + BnR + 'background:#fff;padding:1px;font-size:10px;">:</td>' +
                 '</tr>';
@@ -1276,7 +1276,7 @@ function App() {
         var dateStr = buildNipper(selectedDate);
         var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
             '<style>' +
-            'body{font-family:"MS Gothic","Meiryo",sans-serif;margin:0;padding:4mm;font-size:11px;box-sizing:border-box;}' +
+            'body{font-family:"Meiryo","MS PGothic","Hiragino Kaku Gothic ProN",sans-serif;margin:0;padding:4mm;font-size:11px;box-sizing:border-box;}' +
             'h1{font-size:14px;font-weight:bold;margin:0 0 3px;letter-spacing:2px;}' +
             'p{margin:5px 0 2px;font-size:11px;font-weight:bold;}' +
             'table{border-collapse:collapse;width:100%;table-layout:fixed;}' +
@@ -1297,14 +1297,14 @@ function App() {
     function handlePrintAll() {
         if (!selectedDate || !grid) return;
         var body = carNames.map(function(cname, ci) {
-            return '<div class="car-title">' + cname + '</div>' + buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
+            return buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
         }).join("");
         openPrintWindow("送迎日報　" + selectedDate, body);
     }
     function handlePrintCar(ci) {
         if (!selectedDate || !grid) return;
         var cname = carNames[ci];
-        var body = '<div class="car-title">' + cname + '</div>' + buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
+        var body = buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
         openPrintWindow("送迎日報　" + selectedDate + "　" + cname, body);
     }
     var assigned = useMemo(function () {
