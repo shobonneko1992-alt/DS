@@ -72,6 +72,12 @@ function cloneGrid(g) {
             result[key] = mkGrid();
         }
     });
+    if (g.extraPeople) {
+        result.extraPeople = {};
+        Object.keys(g.extraPeople).forEach(function(k) {
+            result.extraPeople[k] = g.extraPeople[k].slice();
+        });
+    }
     return result;
 }
 function clearNameInGrid(g, name) {
@@ -217,7 +223,7 @@ function WeekTable(props) {
         var tablesHtml = sections.map(function(sec) {
             var rows = props.carNames.map(function(cname, ci) {
                 var driverCells = weekDates.map(function(wd) {
-                    return '<td style="background:#e8f0fe;font-size:10px;padding:2px 4px;border:1px solid #c0ccda;text-align:center;">—</td>';
+                    return '<td style="background:#e8f0fe;font-size:11px;padding:3px 6px;border:1px solid #c0ccda;text-align:center;">—</td>';
                 }).join("");
                 var seatRowsHtml = Array(SEAT_COUNT).fill(null).map(function(_, si) {
                     var cells = weekDates.map(function(wd) {
@@ -228,7 +234,7 @@ function WeekTable(props) {
                         var time = seat ? seat.time : "";
                         var seatNo = seat ? seat.seatNo : "";
                         var bg = colorBgMap[seat && seat.color || ""] || (name ? "#f1f8e9" : "#fff");
-                        return '<td style="background:' + bg + ';font-size:10px;padding:2px 4px;border:1px solid #e0e7ef;">' +
+                        return '<td style="background:' + bg + ';font-size:11px;padding:3px 6px;border:1px solid #e0e7ef;">' +
                             (name ? '<b>' + name + '</b>' + (time ? '<br><span style="color:#555;font-size:9px;">' + time + (seatNo ? " " + seatNo : "") + '</span>' : '') : '<span style="color:#ccc;">—</span>') +
                             '</td>';
                     }).join("");
@@ -910,6 +916,10 @@ function App() {
     var [editingPerson, setEditingPerson] = useState(null);
     var [editingVal, setEditingVal] = useState("");
     var [showPeopleEdit, setShowPeopleEdit] = useState(false);
+    var [showExtraAdd, setShowExtraAdd] = useState(false);
+    var [extraSearch, setExtraSearch] = useState("");
+    var [showDelete, setShowDelete] = useState(false);
+    var [deleteConfirm, setDeleteConfirm] = useState(null);
     var [peopleSort, setPeopleSort] = useState("added");
     var [dragIdx, setDragIdx] = useState(null);
     var [dragOverIdx, setDragOverIdx] = useState(null);
@@ -1048,87 +1058,255 @@ function App() {
         if (!selectedDate || !grid) return;
         handlePrintSection("both");
     }
-    function handlePrintSection(mode, dir) {
+    function handlePrintSection(prd, dir) {
         if (!selectedDate || !grid) return;
-        var dirLabel = dir === "送り" ? "送り" : "迎え";
-        var colorBgMap = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
+        var CIRCLES = ["①","②","③","④","⑤","⑥","⑦"];
+        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0" };
         var dayDrivers = (allGrids[selectedDate] && allGrids[selectedDate].drivers) ? allGrids[selectedDate].drivers : ["","","",""];
-        var sections = mode === "AM"
-            ? [{ label: "AM " + dirLabel, data: grid[gridKey("AM", dir || "迎え")] || mkGrid() }]
-            : mode === "PM"
-            ? [{ label: "PM " + dirLabel, data: grid[gridKey("PM", dir || "迎え")] || mkGrid() }]
-            : [{ label: "AM " + dirLabel, data: grid[gridKey("AM", dir || "迎え")] || mkGrid() },
-               { label: "PM " + dirLabel, data: grid[gridKey("PM", dir || "迎え")] || mkGrid() }];
-        var carsHtml = carNames.map(function(cname, ci) {
-            return '<div class="car-block">' +
-                sections.map(function(sec) {
-                    var rows = sec.data[ci].map(function(seat) {
-                        if (!seat.name) return '';
-                        var bg = colorBgMap[seat.color || ""] || "#fff";
-                        var timeStr = seat.time || "";
-                        var seatStr = seat.seatNo || "";
-                        return '<tr style="background:' + bg + '">' +
-                            '<td class="name">' + seat.name + '</td>' +
-                            '<td class="time">' + timeStr + '</td>' +
-                            '<td class="seatno">' + seatStr + '</td>' +
-                            '</tr>';
-                    }).join("");
-                    return '<div class="section">' +
-                        '<div class="sec-label">' + sec.label + '</div>' +
-                        '<table>' +
-                        '<thead><tr><th>氏名</th><th>時間</th><th>席</th></tr></thead>' +
-                        '<tbody>' + (rows || '<tr><td colspan="3" style="color:#aaa;text-align:center">なし</td></tr>') + '</tbody>' +
-                        '</table></div>';
-                }).join("") +
-                '</div>';
-        });
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-            '<title>' + selectedDate + ' 送迎表</title>' +
+        var gk = gridKey(prd, dir);
+        var dateObj = new Date(selectedDate + "T00:00:00");
+        var DAY_JP2 = ["日","月","火","水","木","金","土"];
+        var dateStr = dateObj.getFullYear() + "年 " + (dateObj.getMonth()+1) + "月 " + dateObj.getDate() + "日（" + DAY_JP2[dateObj.getDay()] + "）";
+        var sectionLabel = (prd === "AM" ? "AM" : "PM") + (dir === "送り" ? "送り【お送り】" : "迎え【お迎え】");
+
+        function buildCarTable(cname, ci) {
+            var drv = dayDrivers[ci] || "";
+            var seats = (grid[gk] || mkGrid())[ci] || [];
+            var maxRows = Math.max(7, seats.filter(function(s){ return s && s.name; }).length);
+            var B = 'border:1px solid #999;';
+            var TD = 'style="' + B + 'padding:2px 4px;font-size:10px;"';
+            var TDc = 'style="' + B + 'padding:2px;font-size:10px;text-align:center;"';
+            var rows = "";
+            for (var i = 0; i < maxRows; i++) {
+                var seat = seats[i] || {};
+                var nm = seat.name ? seat.name + "　様" : "";
+                var tp = (seat.time || "").split(":");
+                var hh = tp[0] || ""; var mm = tp[1] || "";
+                var bg = colorBgMap[seat.color || ""] || "#fff";
+                var circ = CIRCLES[i] || (i+1);
+                rows += '<tr style="background:' + bg + '">' +
+                    '<td ' + TD + '>' + nm + '</td>' +
+                    '<td ' + TDc + '>' + hh + '</td>' +
+                    '<td ' + TDc + '>:</td>' +
+                    '<td ' + TDc + '>' + mm + '</td>' +
+                    '<td ' + TDc + '>' + circ + '</td>' +
+                    '<td style="' + B + 'background:#fff;padding:2px;text-align:center;font-size:10px;">' + circ + '</td>' +
+                    '<td style="' + B + 'background:#fff;padding:2px;min-width:28px;"></td>' +
+                    '<td style="' + B + 'background:#fff;padding:2px;text-align:center;font-size:10px;">:</td>' +
+                    '<td style="' + B + 'background:#fff;padding:2px;min-width:28px;"></td>' +
+                    '</tr>';
+            }
+            return '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;break-inside:avoid;">' +
+                '<colgroup>' +
+                '<col style="width:26%"><col style="width:5%"><col style="width:3%"><col style="width:5%"><col style="width:5%">' +
+                '<col style="width:6%"><col style="width:22%"><col style="width:3%"><col style="width:25%">' +
+                '</colgroup>' +
+                '<thead>' +
+                '<tr>' +
+                '<td colspan="5" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;">' + cname + '（予定）&nbsp;&nbsp;〜</td>' +
+                '<td colspan="4" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;">' + cname + '（実績）</td>' +
+                '</tr>' +
+                '<tr>' +
+                '<td style="' + B + 'font-size:11px;padding:3px 6px;">店発着</td><td colspan="4" style="' + B + 'padding:2px;min-height:30px;">&nbsp;</td>' +
+                '<td style="' + B + 'font-size:11px;padding:3px 6px;">店発着</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
+                '</tr>' +
+                '<tr>' +
+                '<td style="' + B + 'font-size:11px;padding:3px 6px;">運転</td><td colspan="4" style="' + B + 'font-size:11px;padding:3px 6px;">' + drv + '</td>' +
+                '<td style="' + B + 'font-size:11px;padding:3px 6px;">運転</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
+                '</tr>' +
+                '<tr>' +
+                '<td style="' + B + 'font-size:11px;padding:3px 6px;">添乗</td><td colspan="4" style="' + B + 'padding:2px;">&nbsp;</td>' +
+                '<td style="' + B + 'font-size:11px;padding:3px 6px;">添乗</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
+                '</tr>' +
+                '</thead>' +
+                '<tbody>' + rows + '</tbody>' +
+                '</table>';
+        }
+
+        var carsHtml = carNames.map(function(cname, ci){ return buildCarTable(cname, ci); }).join("");
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>送迎日報</title>' +
             '<style>' +
-            'body{font-family:sans-serif;margin:10px;font-size:11px;}' +
-            'h1{font-size:14px;margin:0 0 8px;}' +
-            '.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}' +
-            '.car-block{border:2px solid #1e3a5f;border-radius:6px;overflow:hidden;break-inside:avoid;}' +
-            '.car-name{background:#1e3a5f;color:white;font-weight:bold;font-size:12px;padding:4px 8px;}' +
-            '.driver-name{background:#2d6a9f;color:white;font-size:10px;padding:2px 8px;}' +
-            'table{width:100%;border-collapse:collapse;}' +
-            'th{background:#f0f4f8;font-size:9px;padding:2px 4px;border-bottom:1px solid #ddd;text-align:left;}' +
-            'td{padding:2px 4px;border-bottom:1px solid #f0f0f0;font-size:10px;}' +
-            '@media print{body{margin:5px;}}' +
+            'body{font-family:"MS Gothic",sans-serif;margin:12px;font-size:11px;}' +
+            'h1{font-size:15px;font-weight:bold;margin:0 0 6px;}' +
+            'h2{font-size:12px;font-weight:bold;margin:0 0 8px;border-bottom:1px solid #999;padding-bottom:2px;}' +
+            '@media print{body{margin:6px;}}' +
             '</style></head><body>' +
-            '<h1>デイサービス送迎表　' + selectedDate + '　' + (mode === "AM" ? "AM" : mode === "PM" ? "PM" : "AM・PM") + dirLabel + '</h1>' +
-            '<div class="grid">' +
-            carNames.map(function(cname, ci) {
-                var drv = dayDrivers[ci] || "";
-                return '<div class="car-block">' +
-                    '<div class="car-name">' + cname + '</div>' +
-                    (drv ? '<div class="driver-name">🧑‍✈️ ' + drv + '</div>' : '') +
-                    sections.map(function(sec) {
-                        var rows = sec.data[ci].filter(function(s){ return s.name; }).map(function(seat) {
-                            var bg = colorBgMap[seat.color || ""] || "#fff";
-                            return '<tr style="background:' + bg + '">' +
-                                '<td style="padding:2px 4px;font-size:10px;border-bottom:1px solid #f0f0f0;">' + seat.name + '</td>' +
-                                '<td style="padding:2px 4px;font-size:10px;color:#1e3a5f;font-weight:bold;white-space:nowrap;border-bottom:1px solid #f0f0f0;">' + (seat.time||"") + '</td>' +
-                                '<td style="padding:2px 4px;font-size:10px;color:#555;border-bottom:1px solid #f0f0f0;">' + (seat.seatNo||"") + '</td>' +
-                                '</tr>';
-                        }).join("") || '<tr><td colspan="3" style="padding:3px 4px;font-size:9px;color:#aaa;text-align:center;">なし</td></tr>';
-                        return (sections.length > 1 ? '<div style="background:#e8f0fe;font-weight:bold;font-size:10px;padding:2px 6px;border-bottom:1px solid #ddd;border-top:1px solid #ddd;">' + sec.label + '</div>' : '') +
-                            '<table style="width:100%;border-collapse:collapse;">' +
-                            '<thead><tr><th>氏名</th><th>時間</th><th>席</th></tr></thead>' +
-                            '<tbody>' + rows + '</tbody></table>';
-                    }).join("") +
-                    '</div>';
-            }).join("") +
-            '</div></body></html>';
+            '<h1>送迎日報　' + dateStr + '</h1>' +
+            '<h2>' + sectionLabel + '　使用開始時(km)______　(km)　使用終了時(km)______　(km)　______</h2>' +
+            carsHtml +
+            '<div style="border:1px solid #999;padding:6px 10px;margin-top:4px;font-size:11px;min-height:36px;">振り替え：</div>' +
+            '</body></html>';
         var w = window.open("", "_blank");
-        if (!w) { alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してから再度お試しください。"); return; }
-        w.document.write(html);
-        w.document.close();
-        w.focus();
+        if (!w) { alert("ポップアップがブロックされています。"); return; }
+        w.document.write(html); w.document.close(); w.focus();
         setTimeout(function() { w.print(); }, 400);
     }
     var grid = selectedDate ? (allGrids[selectedDate] || mkDay()) : null;
     var gk = gridKey(period, direction);
+    function buildNipper(selectedDate) {
+        var d = new Date(selectedDate + "T00:00:00");
+        var DJ = ["日","月","火","水","木","金","土"];
+        return d.getFullYear() + "年 " + (d.getMonth()+1) + "月 " + d.getDate() + "日（" + DJ[d.getDay()] + "）";
+    }
+    function buildSectionTable(ci, cname, drv, grid, gk, label) {
+        var CIRC = ["①","②","③","④","⑤","⑥","⑦"];
+        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0" };
+        var seats = (grid[gk] || mkGrid())[ci] || [];
+        var filledCount = seats.filter(function(s){ return s && s.name; }).length;
+        var maxRows = Math.max(7, filledCount);
+        var B = "border:1px solid #aaa;";
+        var Bc = B + "text-align:center;";
+
+        var BL = "border-top:1px solid #aaa;border-bottom:1px solid #aaa;border-left:1px solid #aaa;border-right:none;";
+        var Bn = "border-top:1px solid #aaa;border-bottom:1px solid #aaa;border-left:none;border-right:none;text-align:center;";
+        var BnR = "border-top:1px solid #aaa;border-bottom:1px solid #aaa;border-left:none;border-right:1px solid #aaa;text-align:center;";
+        var rows = "";
+        for (var i = 0; i < maxRows; i++) {
+            var seat = seats[i] || {};
+            var nm = seat.name || "";
+            var tp = (seat.time || "").split(":");
+            var hh = tp[0] || ""; var mm = tp[1] || "";
+            var bg = colorBgMap[seat.color || ""] || "#fff";
+            var circ = CIRC[i] || (i+1);
+            rows += '<tr style="background:' + bg + ';height:22px;">' +
+                '<td style="' + B + 'padding:1px 1px;font-size:10px;">&nbsp;</td>' +
+                '<td style="' + BL + 'padding:1px 4px;font-size:10px;text-align:center;font-weight:bold;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 2px;font-size:10px;">様</td>' +
+                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + hh + '</td>' +
+                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">:</td>' +
+                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + mm + '</td>' +
+                '<td style="' + Bc + 'background:#fff;padding:1px 1px;font-size:10px;">' + circ + '</td>' +
+                '<td style="' + BnR + 'background:#fff;padding:1px 1px;font-size:10px;">:</td>' +
+                '</tr>';
+        }
+
+        return '<div style="display:flex;align-items:baseline;margin:4px 0 1px;"><span style="font-size:9px;font-weight:bold;white-space:nowrap;min-width:9.5em;">【' + label + '】</span><span style="font-size:9px;font-weight:bold;white-space:nowrap;">使用開始時&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(km)&nbsp;&nbsp;使用終了時&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(km)</span></div>' +
+            '<table style="width:100%;border-collapse:collapse;margin-bottom:4px;">' +
+            '<colgroup>' +
+            '<col style="width:5%">' +   /* label */
+            '<col style="width:47%">' +  /* name */
+            '<col style="width:5%">' +   /* 様 */
+            '<col style="width:6%">' +   /* hour */
+            '<col style="width:3%">' +   /* : */
+            '<col style="width:5%">' +   /* minute */
+            '<col style="width:3%">' +   /* circle 実績 */
+            '<col style="width:26%">' +  /* : 実績 */
+            '</colgroup>' +
+            '<thead>' +
+            '<tr>' +
+            '<td colspan="6" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;text-align:center;">' + cname + '（予定）&nbsp;&nbsp;&nbsp;&nbsp;〜</td>' +
+            '<td colspan="2" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;text-align:center;">' + cname + '（実績）</td>' +
+            '</tr>' +
+            '<tr style="height:22px;">' +
+            '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">店発着</td>' +
+            '<td colspan="5" style="' + B + 'padding:1px;">&nbsp;</td>' +
+            '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">店発着</td>' +
+            '<td style="' + B + 'padding:1px;">&nbsp;</td>' +
+            '</tr>' +
+            '<tr style="height:22px;">' +
+            '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">運転</td>' +
+            '<td colspan="5" style="' + B + 'font-size:10px;padding:1px 4px;">' + drv + '</td>' +
+            '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">運転</td>' +
+            '<td style="' + B + 'padding:1px;">&nbsp;</td>' +
+            '</tr>' +
+            '<tr style="height:22px;">' +
+            '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">添乗</td>' +
+            '<td colspan="5" style="' + B + 'padding:1px;">&nbsp;</td>' +
+            '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">添乗</td>' +
+            '<td style="' + B + 'padding:1px;">&nbsp;</td>' +
+            '</tr>' +
+            '</thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table>';
+    }
+    function buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList) {
+        var dayDrivers = (allGrids[selectedDate] && allGrids[selectedDate].drivers) ? allGrids[selectedDate].drivers : ["","","",""];
+        var drv = dayDrivers[ci] || "";
+        // ドライバー一覧を横並びで表示（◯を書き込めるスペース付き）
+        var drvRow = (driverList && driverList.length > 0)
+            ? driverList.map(function(d) { return d; }).join('&nbsp;&nbsp;')
+            : (drv || '&nbsp;');
+        var sections = [
+            { gk: gridKey("AM","迎え"), label: "お迎え" },
+            { gk: gridKey("AM","送り"), label: "お送り・お迎え" },
+            { gk: gridKey("PM","送り"), label: "お送り" },
+        ];
+        // PM迎えの行だけ（オドメーターなし）をAM送りの直後に挿入
+        var pmGk = gridKey("PM","迎え");
+        var pmSeats = (grid[pmGk] || mkGrid())[ci] || [];
+        var CIRC = ["①","②","③","④","⑤","⑥","⑦"];
+        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0" };
+        var B = "border:1px solid #aaa;";
+        var Bc = B + "text-align:center;";
+        var BL = "border-top:1px solid #aaa;border-bottom:1px solid #aaa;border-left:1px solid #aaa;border-right:none;";
+        var Bn = "border-top:1px solid #aaa;border-bottom:1px solid #aaa;border-left:none;border-right:none;text-align:center;";
+        var BnR = "border-top:1px solid #aaa;border-bottom:1px solid #aaa;border-left:none;border-right:1px solid #aaa;text-align:center;";
+        var maxRows = Math.max(7, pmSeats.filter(function(s){ return s && s.name; }).length);
+        var pmRows = "";
+        for (var i = 0; i < maxRows; i++) {
+            var seat = pmSeats[i] || {};
+            var nm = seat.name || "";
+            var tp = (seat.time || "").split(":");
+            var hh = tp[0] || ""; var mm = tp[1] || "";
+            var bg = colorBgMap[seat.color || ""] || "#fff";
+            var circ = CIRC[i] || (i+1);
+            pmRows += '<tr style="background:' + bg + ';height:22px;">' +
+                '<td style="' + B + 'padding:1px 2px;font-size:10px;">&nbsp;</td>' +
+                '<td style="' + BL + 'padding:1px 3px;font-size:10px;text-align:center;font-weight:bold;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 2px;font-size:10px;">様</td>' +
+                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + hh + '</td>' +
+                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">:</td>' +
+                '<td style="' + Bn + 'padding:1px 1px;font-size:10px;">' + mm + '</td>' +
+                '<td style="' + Bc + 'background:#fff;padding:1px 2px;font-size:10px;">' + circ + '</td>' +
+                '<td style="' + BnR + 'background:#fff;padding:1px;font-size:10px;">:</td>' +
+                '</tr>';
+        }
+        var pmTable = '<table style="width:100%;border-collapse:collapse;margin-bottom:4px;"><colgroup>' +
+            '<col style="width:5%"><col style="width:47%"><col style="width:5%"><col style="width:6%"><col style="width:3%"><col style="width:5%"><col style="width:3%"><col style="width:26%">' +
+            '</colgroup><tbody>' + pmRows + '</tbody></table>';
+        var result = buildSectionTable(ci, cname, drvRow, grid, gridKey("AM","迎え"), "お迎え") +
+            buildSectionTable(ci, cname, drvRow, grid, gridKey("AM","送り"), "お送り・お迎え") +
+            '<div style="border-top:3px solid #000;margin:-2px 0 -1px 0;"></div>' +
+            pmTable +
+            buildSectionTable(ci, cname, drvRow, grid, gridKey("PM","送り"), "お送り") +
+            '<div style="border:1px solid #aaa;padding:6px 10px;font-size:11px;min-height:28px;margin-top:5px;">振り替え：</div>';
+        return result;
+    }
+    function openPrintWindow(title, bodyHtml) {
+        var dateStr = buildNipper(selectedDate);
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
+            '<style>' +
+            'body{font-family:"MS Gothic","Meiryo",sans-serif;margin:0;padding:4mm;font-size:11px;box-sizing:border-box;}' +
+            'h1{font-size:14px;font-weight:bold;margin:0 0 3px;letter-spacing:2px;}' +
+            'p{margin:5px 0 2px;font-size:11px;font-weight:bold;}' +
+            'table{border-collapse:collapse;width:100%;table-layout:fixed;}' +
+            'td{font-size:10px;padding:1px 3px;overflow:hidden;}' +
+            '@media print{' +
+            '@page{size:A4 portrait;margin:4mm;}' +
+            'body{padding:2mm;}' +
+            '}' +
+            '</style></head><body>' +
+            '<h1>送迎日報　　' + dateStr + '</h1>' +
+            bodyHtml +
+            '</body></html>';
+        var w = window.open("", "_blank");
+        if (!w) { alert("ポップアップがブロックされています。"); return; }
+        w.document.write(html); w.document.close(); w.focus();
+        setTimeout(function() { w.print(); }, 400);
+    }
+    function handlePrintAll() {
+        if (!selectedDate || !grid) return;
+        var body = carNames.map(function(cname, ci) {
+            return '<div class="car-title">' + cname + '</div>' + buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
+        }).join("");
+        openPrintWindow("送迎日報　" + selectedDate, body);
+    }
+    function handlePrintCar(ci) {
+        if (!selectedDate || !grid) return;
+        var cname = carNames[ci];
+        var body = '<div class="car-title">' + cname + '</div>' + buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
+        openPrintWindow("送迎日報　" + selectedDate + "　" + cname, body);
+    }
     var assigned = useMemo(function () {
         var s = new Set();
         if (!grid) return s;
@@ -1430,23 +1608,30 @@ function App() {
         var map = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 }; // DAY_LABELS["月","火","水","木","金"]に対応
         return map[dow] !== undefined ? map[dow] : null;
     })();
-    var filtered = people.filter(function (p) {
-        if (p.name.indexOf(search) === -1) return false;
-        if (absent.has(p.name)) return false;
-        if (!p.days || p.days.length === 0) return false;
-        if (selectedDayIdx !== null && p.days.indexOf(selectedDayIdx) === -1) return false;
-        // 曜日別設定ON
-        if (p.dayPeriodsEnabled && p.dayPeriods) {
-            if (selectedDayIdx === null) return false;
-            var dp = p.dayPeriods[selectedDayIdx];
-            if (!dp) return false;
-            if (dp !== period) return false;
-        } else {
-            if (!p.periods || p.periods.length === 0) return false;
-            if (p.periods.indexOf(period) === -1) return false;
-        }
-        return true;
-    });
+    var filtered = (function() {
+        var extraNames = (selectedDate && allGrids[selectedDate] && allGrids[selectedDate].extraPeople) ? (allGrids[selectedDate].extraPeople[period] || []) : [];
+        var extraList = extraNames.filter(function(name) {
+            return name.indexOf(search) >= 0;
+        }).map(function(name) { return people.find(function(p){ return p.name === name; }) || { name: name, kana: "", memo: "", days: [], periods: [], _extra: true }; });
+        var regularList = people.filter(function (p) {
+            if (p.name.indexOf(search) === -1) return false;
+            if (absent.has(p.name)) return false;
+            if (extraNames.indexOf(p.name) >= 0) return false;
+            if (!p.days || p.days.length === 0) return false;
+            if (selectedDayIdx !== null && p.days.indexOf(selectedDayIdx) === -1) return false;
+            if (p.dayPeriodsEnabled && p.dayPeriods) {
+                if (selectedDayIdx === null) return false;
+                var dp = p.dayPeriods[selectedDayIdx];
+                if (!dp) return false;
+                if (dp !== period) return false;
+            } else {
+                if (!p.periods || p.periods.length === 0) return false;
+                if (p.periods.indexOf(period) === -1) return false;
+            }
+            return true;
+        });
+        return extraList.concat(regularList);
+    })();
     var total = assigned.size;
     var usageCount = useMemo(function () {
         var counts = {};
@@ -1466,7 +1651,10 @@ function App() {
         return counts;
     }, [allGrids, people]);
     var sortedPeople = useMemo(function () {
+        var extraNames = (selectedDate && allGrids[selectedDate] && allGrids[selectedDate].extraPeople) ? (allGrids[selectedDate].extraPeople[period] || []) : [];
+        var extraList = extraNames.map(function(name) { return people.find(function(p){ return p.name === name; }) || { name: name, kana: "", memo: "", days: [], periods: [], _extra: true }; });
         var list = people.slice().filter(function(p) {
+            if (extraNames.indexOf(p.name) >= 0) return false;
             if (!selectedDate) return true;
             if (!p.days || p.days.length === 0) return false;
             if (selectedDayIdx !== null && p.days.indexOf(selectedDayIdx) === -1) return false;
@@ -1481,6 +1669,7 @@ function App() {
             }
             return true;
         });
+        list = extraList.concat(list);
         if (peopleSort === "name") {
             list.sort(function (a, b) {
                 var ka = a.kana || a.name, kb = b.kana || b.name;
@@ -1488,7 +1677,7 @@ function App() {
             });
         }
         return list;
-    }, [people, peopleSort, usageCount, selectedDayIdx, period, selectedDate]);
+    }, [people, peopleSort, usageCount, selectedDayIdx, period, selectedDate, allGrids]);
     var calDays = useMemo(function () {
         var last = new Date(viewYear, viewMonth + 1, 0).getDate();
         var cells = [];
@@ -1729,6 +1918,29 @@ function App() {
     }
     function toggleDriverEdit() { setShowDriverEdit(function (v) { return !v; }); }
     function togglePeopleEdit() { setShowPeopleEdit(function (v) { return !v; }); }
+    function addExtraPerson(name) {
+        if (!selectedDate || !name.trim()) return;
+        setAllGrids(function(prev) {
+            var day = Object.assign({}, prev[selectedDate] || mkDay());
+            var ep = Object.assign({}, day.extraPeople || {});
+            var list = (ep[period] || []).slice();
+            if (list.indexOf(name) >= 0) return prev;
+            list.push(name);
+            ep[period] = list;
+            day.extraPeople = ep;
+            var next = Object.assign({}, prev); next[selectedDate] = day; return next;
+        });
+    }
+    function removeExtraPerson(name) {
+        if (!selectedDate) return;
+        setAllGrids(function(prev) {
+            var day = Object.assign({}, prev[selectedDate] || mkDay());
+            var ep = Object.assign({}, day.extraPeople || {});
+            ep[period] = (ep[period] || []).filter(function(n){ return n !== name; });
+            day.extraPeople = ep;
+            var next = Object.assign({}, prev); next[selectedDate] = day; return next;
+        });
+    }
     function toggleMemoCar(ci) { setOpenMemoCar(function (prev) { return prev === ci ? null : ci; }); }
     function toggleDriverKey(ci) { setOpenDriverKey(function (prev) { return prev === ci ? null : ci; }); }
     function toggleMemoOpen(idx) { setMemoOpen(function (prev) { return prev === idx ? null : idx; }); }
@@ -2055,6 +2267,16 @@ function App() {
     };
     var sectionLabel = { fontSize: 12, fontWeight: 700, color: "#718096", marginBottom: 6 };
     return (React.createElement("div", { style: { fontFamily: "sans-serif", minHeight: "100vh", background: "#f0f4f8" } },
+        deleteConfirm && React.createElement("div", { style: modalOverlay },
+            React.createElement("div", { style: { background: "white", borderRadius: 16, padding: 24, width: "100%", maxWidth: 300, textAlign: "center" } },
+                React.createElement("div", { style: { fontSize: 28, marginBottom: 10 } }, "🗑️"),
+                React.createElement("div", { style: { fontWeight: 800, fontSize: 15, color: "#1e3a5f", marginBottom: 8 } }, "利用者の削除"),
+                React.createElement("div", { style: { fontSize: 13, color: "#718096", marginBottom: 20 } },
+                    React.createElement("span", { style: { fontWeight: 700, color: "#dc2626" } }, deleteConfirm),
+                    "　を利用者一覧から削除しますか？"),
+                React.createElement("div", { style: { display: "flex", gap: 8 } },
+                    React.createElement("button", { onClick: function(){ setDeleteConfirm(null); }, style: { flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #e0e7ef", background: "white", color: "#718096", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "キャンセル"),
+                    React.createElement("button", { onClick: function(){ removePerson(deleteConfirm); setDeleteConfirm(null); }, style: { flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "#dc2626", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "削除する")))),
         personDetailPage !== null && people[personDetailPage] && React.createElement(PersonDetailPage, {
             person: people[personDetailPage],
             absent: absent,
@@ -2721,9 +2943,9 @@ function App() {
                                         flexShrink: 0,
                                     }}, label);
                                 })),
-                            // ── 印刷ドロップダウン ──
+                            // ── 印刷ボタン ──
                             React.createElement("div", { style: { position: "relative", marginLeft: "auto" } },
-                                React.createElement("button", { onClick: function() { setShowDayPrintMenu(function(v) { return !v; }); }, style: {
+                                React.createElement("button", { onClick: function() { setShowDayPrintMenu(function(v){ return !v; }); }, style: {
                                     padding: "4px 12px", borderRadius: 50, border: "none", cursor: "pointer",
                                     fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
                                     background: "#e2e8f0", color: "#1e3a5f",
@@ -2732,28 +2954,22 @@ function App() {
                                     position: "absolute", top: "calc(100% + 4px)", right: 0,
                                     background: "white", border: "1.5px solid #e0e7ef", borderRadius: 10,
                                     boxShadow: "0 4px 16px rgba(0,0,0,.12)", zIndex: 200,
-                                    overflow: "hidden", minWidth: 130,
+                                    overflow: "hidden", minWidth: 150,
                                 } },
-                                    React.createElement("button", { onClick: function() { handlePrintSection("AM", "迎え"); setShowDayPrintMenu(false); }, style: {
+                                    React.createElement("button", { onClick: function() { handlePrintCar(0); setShowDayPrintMenu(false); }, style: {
                                         display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
-                                        background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                                        background: "#f0f4f8", border: "none", borderBottom: "1px solid #e0e7ef",
                                         fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
-                                    } }, "🌅 AM 迎え"),
-                                    React.createElement("button", { onClick: function() { handlePrintSection("AM", "送り"); setShowDayPrintMenu(false); }, style: {
-                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
-                                        background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
-                                        fontSize: 12, fontWeight: 700, color: "#7c3aed", cursor: "pointer",
-                                    } }, "🌅 AM 送り"),
-                                    React.createElement("button", { onClick: function() { handlePrintSection("PM", "迎え"); setShowDayPrintMenu(false); }, style: {
-                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
-                                        background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
-                                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
-                                    } }, "🌇 PM 迎え"),
-                                    React.createElement("button", { onClick: function() { handlePrintSection("PM", "送り"); setShowDayPrintMenu(false); }, style: {
-                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
-                                        background: "white", border: "none",
-                                        fontSize: 12, fontWeight: 700, color: "#7c3aed", cursor: "pointer",
-                                    } }, "🌇 PM 送り"))),
+                                    } }, "🚐 " + carNames[0]),
+                                    carNames.slice(1).map(function(cname, i) {
+                                        var ci = i + 1;
+                                        return React.createElement("button", { key: ci, onClick: function() { handlePrintCar(ci); setShowDayPrintMenu(false); }, style: {
+                                            display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                            background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                                            fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                                        } }, "🚐 " + cname);
+                                    })
+                                )),
                             dups.size > 0 && (React.createElement("div", { style: { background: "#fff3e0", border: "1.5px solid #ffb74d", borderRadius: 8, padding: "3px 8px", fontSize: 11, color: "#e65100", fontWeight: 600 } }, "\u26A0\uFE0F \u91CD\u8907")))),
                     dupDetails.length > 0 && (React.createElement("div", { style: { marginBottom: 8, background: "#fff3e0", border: "2px solid #ffb74d", borderRadius: 10, padding: "10px 14px" } },
                         React.createElement("div", { style: { fontWeight: 800, fontSize: 13, color: "#e65100", marginBottom: 6 } },
@@ -2904,32 +3120,75 @@ function App() {
                                 "\uD83D\uDCCB \u5229\u7528\u8005\u4E00\u89A7\uFF08",
                                 period === "AM" ? "午前" : "午後",
                                 "\uFF09"),
-                            React.createElement("button", { onClick: togglePeopleEdit, style: {
+                            React.createElement("button", { onClick: function(){ setShowPeopleEdit(function(v){ return !v; }); setShowExtraAdd(false); setShowDelete(false); setExtraSearch(""); }, style: {
                                     fontSize: 11, padding: "4px 12px", borderRadius: 20, cursor: "pointer", fontWeight: 600,
                                     border: "1.5px solid #2d6a9f",
                                     background: showPeopleEdit ? "#2d6a9f" : "white",
                                     color: showPeopleEdit ? "white" : "#2d6a9f",
                                 } }, showPeopleEdit ? "✕ 閉じる" : "✏️ 編集")),
-                        showPeopleEdit && (React.createElement("div", { style: { marginBottom: 10, padding: 10, background: "#f8fafc", borderRadius: 8, border: "1.5px solid #e0e7ef" } },
-                            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto" } }, people.map(function (p, i) {
-                                return (React.createElement("div", { key: i, style: { display: "flex", flexDirection: "column", gap: 3 } },
-                                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } },
-                                        React.createElement("div", { style: {
-                                                flex: 1, fontSize: 12, padding: "4px 8px", borderRadius: 6,
-                                                background: "white", border: "1px solid #e0e7ef", color: "#1e3a5f",
-                                            } }, p.name),
-                                        React.createElement("button", { onClick: function () { toggleMemoOpen(i); }, style: {
-                                                background: p.memo ? "#fef9c3" : "#f0f4f8",
-                                                border: "1px solid " + (p.memo ? "#fde047" : "#e0e7ef"),
-                                                borderRadius: 6, padding: "4px 7px", fontSize: 11,
-                                                color: p.memo ? "#854d0e" : "#718096",
-                                                cursor: "pointer", fontWeight: 700, flexShrink: 0,
-                                            } }, "\uD83D\uDCDD")),
-                                    memoOpen === i && (React.createElement("textarea", { value: p.memo, onChange: function (e) { setMemo(p.name, e.target.value); }, placeholder: "\u30E1\u30E2\u3092\u5165\u529B\u2026", style: { width: "100%", border: "1.5px solid #fde047", borderRadius: 6, padding: "6px 8px", fontSize: 12, outline: "none", resize: "none", minHeight: 60, background: "#fffef0", fontFamily: "inherit" } }))));
-                            })))),
+                        showPeopleEdit && React.createElement("div", { style: { marginBottom: 10, padding: 10, background: "#f8fafc", borderRadius: 8, border: "1.5px solid #e0e7ef" } },
+                            React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } },
+                                React.createElement("button", { onClick: function(){ setShowExtraAdd(function(v){ return !v; }); setShowDelete(false); setExtraSearch(""); }, style: {
+                                    flex: 1, fontSize: 12, padding: "7px 0", borderRadius: 10, cursor: "pointer", fontWeight: 700,
+                                    border: "1.5px solid #16a34a",
+                                    background: showExtraAdd ? "#16a34a" : "white",
+                                    color: showExtraAdd ? "white" : "#16a34a",
+                                } }, showExtraAdd ? "✕ 閉じる" : "➕ 追加"),
+                                React.createElement("button", { onClick: function(){ setShowDelete(function(v){ return !v; }); setShowExtraAdd(false); }, style: {
+                                    flex: 1, fontSize: 12, padding: "7px 0", borderRadius: 10, cursor: "pointer", fontWeight: 700,
+                                    border: "1.5px solid #dc2626",
+                                    background: showDelete ? "#dc2626" : "white",
+                                    color: showDelete ? "white" : "#dc2626",
+                                } }, showDelete ? "✕ 閉じる" : "🗑 削除")),
+                            showDelete && React.createElement("div", { style: { padding: 8, background: "#fff5f5", borderRadius: 8, border: "1.5px solid #fca5a5" } },
+                                React.createElement("div", { style: { fontSize: 11, color: "#dc2626", fontWeight: 700, marginBottom: 8 } }, "削除する利用者をタップ"),
+                                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 200, overflowY: "auto" } },
+                                    people.map(function(p) {
+                                        return React.createElement("div", { key: p.name, onClick: function(){ setDeleteConfirm(p.name); }, style: {
+                                            display: "flex", alignItems: "center", gap: 4,
+                                            padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                                            background: "white", border: "1.5px solid #fca5a5", color: "#dc2626",
+                                            cursor: "pointer", userSelect: "none",
+                                        } }, "🗑 " + p.name);
+                                    })
+                                )
+                            ),
+                            showExtraAdd && React.createElement("div", { style: { padding: 8, background: "#f0fdf4", borderRadius: 8, border: "1.5px solid #86efac" } },
+                                React.createElement("div", { style: { fontSize: 11, color: "#15803d", fontWeight: 700, marginBottom: 6 } }, "振替・臨時利用者を追加（" + (period === "AM" ? "午前" : "午後") + "のみ）"),
+                                React.createElement("input", { value: extraSearch, onChange: function(e){ setExtraSearch(e.target.value); }, placeholder: "名前で検索…", style: { width: "100%", border: "1.5px solid #86efac", borderRadius: 6, padding: "6px 8px", fontSize: 12, outline: "none", marginBottom: 6, boxSizing: "border-box" } }),
+                                React.createElement("div", { style: { maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 } },
+                                    people.filter(function(p) {
+                                        var ep = (selectedDate && allGrids[selectedDate] && allGrids[selectedDate].extraPeople) ? (allGrids[selectedDate].extraPeople[period] || []) : [];
+                                        if (ep.indexOf(p.name) >= 0) return false;
+                                        if (!extraSearch.trim()) return true;
+                                        return p.name.indexOf(extraSearch.trim()) >= 0 || (p.kana && p.kana.indexOf(extraSearch.trim()) >= 0);
+                                    }).map(function(p) {
+                                        return React.createElement("button", { key: p.name, onClick: function(){ addExtraPerson(p.name); setExtraSearch(""); }, style: {
+                                            textAlign: "left", padding: "5px 10px", borderRadius: 6, border: "1px solid #86efac",
+                                            background: "white", fontSize: 12, color: "#1e3a5f", cursor: "pointer", fontWeight: 600,
+                                        } }, "＋ " + p.name);
+                                    }),
+                                    extraSearch.trim() && !people.some(function(p){ return p.name === extraSearch.trim(); }) &&
+                                        React.createElement("button", { onClick: function(){ addExtraPerson(extraSearch.trim()); setExtraSearch(""); }, style: {
+                                            textAlign: "left", padding: "5px 10px", borderRadius: 6, border: "1px dashed #16a34a",
+                                            background: "#f0fdf4", fontSize: 12, color: "#15803d", cursor: "pointer", fontWeight: 700,
+                                        } }, "＋「" + extraSearch.trim() + "」を新規追加")
+                                ),
+                                (selectedDate && allGrids[selectedDate] && allGrids[selectedDate].extraPeople && (allGrids[selectedDate].extraPeople[period] || []).length > 0) && React.createElement("div", { style: { marginTop: 8, borderTop: "1px solid #bbf7d0", paddingTop: 6 } },
+                                    React.createElement("div", { style: { fontSize: 10, color: "#15803d", fontWeight: 700, marginBottom: 4 } }, "追加済み"),
+                                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
+                                        (allGrids[selectedDate].extraPeople[period] || []).map(function(name) {
+                                            return React.createElement("div", { key: name, style: { display: "flex", alignItems: "center", gap: 3, background: "#dcfce7", border: "1px solid #86efac", borderRadius: 20, padding: "2px 8px", fontSize: 11 } },
+                                                React.createElement("span", { style: { color: "#15803d", fontWeight: 600 } }, name),
+                                                React.createElement("button", { onClick: function(){ removeExtraPerson(name); }, style: { background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, fontWeight: 700 } }, "×"));
+                                        })
+                                    )
+                                )
+                            )
+                        ),
                         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, sortedPeople.map(function (p, i) {
-                            var isA = assigned.has(p.name), isDup = dups.has(p.name), isOff = absent.has(p.name);
-                            return (React.createElement("div", { key: i, onClick: function() { toggleAbsent(p.name); }, style: {
+                            var isA = assigned.has(p.name), isDup = dups.has(p.name), isOff = !p._extra && absent.has(p.name);
+                            return (React.createElement("div", { key: i, onClick: function() { if (!p._extra) toggleAbsent(p.name); }, style: {
                                     padding: "3px 10px", borderRadius: 20, fontSize: 11, display: "flex", alignItems: "center", gap: 4,
                                     fontWeight: isA ? 600 : 400,
                                     background: isOff ? "#ffe4e6" : isDup ? "#fff3e0" : isA ? "#fef9c3" : "#f0f4f8",
@@ -2942,7 +3201,9 @@ function App() {
                                 isOff ? "💤" : isDup ? "⚠️" : isA ? "✓" : "○",
                                 " ",
                                 p.name,
-                                p.memo && React.createElement("span", { style: { fontSize: 10 } }, "\uD83D\uDCDD")));
+                                p._extra && React.createElement("span", { style: { fontSize: 9, background: "#16a34a", color: "white", borderRadius: 4, padding: "1px 4px", marginLeft: 2 } }, "振替"),
+                                p.memo && React.createElement("span", { style: { fontSize: 10 } }, "\uD83D\uDCDD"),
+                                p._extra && React.createElement("span", { onClick: function(e){ e.stopPropagation(); removeExtraPerson(p.name); }, style: { fontSize: 12, color: "#dc2626", marginLeft: 2, fontWeight: 700, cursor: "pointer" } }, "×")));
                         }))),
                     dupConfirm && (React.createElement("div", { style: modalOverlay },
                         React.createElement("div", { style: { background: "white", borderRadius: 16, padding: 24, width: "100%", maxWidth: 300, textAlign: "center" } },
