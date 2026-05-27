@@ -1111,7 +1111,7 @@ function App() {
                 '<td style="' + B + 'font-size:11px;padding:0px 3px;">店発着</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
                 '</tr>' +
                 '<tr style="height:19px;text-align:center;">' +
-                '<td style="' + B + 'font-size:11px;padding:0px 3px;">運転</td><td colspan="4" style="' + B + 'font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;">' + drv + '</td>' +
+                '<td style="' + B + 'font-size:11px;padding:0px 3px;">運転</td><td colspan="4" style="' + B + 'font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-align:center;">' + drv + '</td>' +
                 '<td style="' + B + 'font-size:11px;padding:0px 3px;">運転</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
                 '</tr>' +
                 '<tr style="height:19px;">' +
@@ -1194,8 +1194,8 @@ function App() {
             '</colgroup>' +
             '<thead>' +
             '<tr>' +
-            '<td colspan="6" style="' + B + 'background:#ffff99;font-weight:bold;font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;">' + cname + '（予定）</td>' +
-            '<td colspan="2" style="' + B + 'background:#ffff99;font-weight:bold;font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;">' + cname + '（実績）</td>' +
+            '<td colspan="6" style="' + B + 'background:#ffff99;font-weight:bold;font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-align:center;">' + cname + '（予定）</td>' +
+            '<td colspan="2" style="' + B + 'background:#ffff99;font-weight:bold;font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-align:center;">' + cname + '（実績）</td>' +
             '</tr>' +
             '<tr style="height:19px;">' +
             '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">店発着</td>' +
@@ -1224,7 +1224,7 @@ function App() {
         var drv = dayDrivers[ci] || "";
         // ドライバー一覧を横並びで表示（◯を書き込めるスペース付き）
         var drvRow = (driverList && driverList.length > 0)
-            ? driverList.map(function(d) { return d; }).join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;')
+            ? driverList.map(function(d) { return d; }).join('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;')
             : (drv || '&nbsp;');
         var sections = [
             { gk: gridKey("AM","迎え"), label: "お迎え" },
