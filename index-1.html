@@ -223,7 +223,7 @@ function WeekTable(props) {
         var tablesHtml = sections.map(function(sec) {
             var rows = props.carNames.map(function(cname, ci) {
                 var driverCells = weekDates.map(function(wd) {
-                    return '<td style="background:#e8f0fe;font-size:11px;padding:3px 6px;border:1px solid #c0ccda;text-align:center;">—</td>';
+                    return '<td style="background:#e8f0fe;font-size:11px;padding:0px 3px;border:1px solid #c0ccda;text-align:center;">—</td>';
                 }).join("");
                 var seatRowsHtml = Array(SEAT_COUNT).fill(null).map(function(_, si) {
                     var cells = weekDates.map(function(wd) {
@@ -234,7 +234,7 @@ function WeekTable(props) {
                         var time = seat ? seat.time : "";
                         var seatNo = seat ? seat.seatNo : "";
                         var bg = colorBgMap[seat && seat.color || ""] || (name ? "#f1f8e9" : "#fff");
-                        return '<td style="background:' + bg + ';font-size:11px;padding:3px 6px;border:1px solid #e0e7ef;">' +
+                        return '<td style="background:' + bg + ';font-size:11px;padding:0px 3px;border:1px solid #e0e7ef;">' +
                             (name ? '<b>' + name + '</b>' + (time ? '<br><span style="color:#555;font-size:9px;">' + time + (seatNo ? " " + seatNo : "") + '</span>' : '') : '<span style="color:#ccc;">—</span>') +
                             '</td>';
                     }).join("");
@@ -1056,7 +1056,7 @@ function App() {
     }
     function handlePrint() {
         if (!selectedDate || !grid) return;
-        handlePrintSection("both");
+        handlePrintAll();
     }
     function handlePrintSection(prd, dir) {
         if (!selectedDate || !grid) return;
@@ -1103,20 +1103,20 @@ function App() {
                 '</colgroup>' +
                 '<thead>' +
                 '<tr>' +
-                '<td colspan="5" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;">' + cname + '（予定）</td>' +
-                '<td colspan="4" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;">' + cname + '（実績）</td>' +
+                '<td colspan="5" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:0px 3px;">' + cname + '（予定）</td>' +
+                '<td colspan="4" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:0px 3px;">' + cname + '（実績）</td>' +
                 '</tr>' +
-                '<tr>' +
-                '<td style="' + B + 'font-size:11px;padding:3px 6px;">店発着</td><td colspan="4" style="' + B + 'padding:2px;min-height:30px;">&nbsp;</td>' +
-                '<td style="' + B + 'font-size:11px;padding:3px 6px;">店発着</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
+                '<tr style="height:19px;">' +
+                '<td style="' + B + 'font-size:11px;padding:0px 3px;">店発着</td><td colspan="4" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
+                '<td style="' + B + 'font-size:11px;padding:0px 3px;">店発着</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
                 '</tr>' +
-                '<tr style="text-align:center;">' +
-                '<td style="' + B + 'font-size:11px;padding:3px 6px;">運転</td><td colspan="4" style="' + B + 'font-size:13px;padding:3px 6px;text-align:center;">' + drv + '</td>' +
-                '<td style="' + B + 'font-size:11px;padding:3px 6px;">運転</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
+                '<tr style="height:19px;text-align:center;">' +
+                '<td style="' + B + 'font-size:11px;padding:0px 3px;">運転</td><td colspan="4" style="' + B + 'font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;">' + drv + '</td>' +
+                '<td style="' + B + 'font-size:11px;padding:0px 3px;">運転</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
                 '</tr>' +
-                '<tr>' +
-                '<td style="' + B + 'font-size:11px;padding:3px 6px;">添乗</td><td colspan="4" style="' + B + 'padding:2px;">&nbsp;</td>' +
-                '<td style="' + B + 'font-size:11px;padding:3px 6px;">添乗</td><td colspan="3" style="' + B + 'padding:2px;">&nbsp;</td>' +
+                '<tr style="height:19px;">' +
+                '<td style="' + B + 'font-size:11px;padding:0px 3px;">添乗</td><td colspan="4" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
+                '<td style="' + B + 'font-size:11px;padding:0px 3px;">添乗</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
                 '</tr>' +
                 '</thead>' +
                 '<tbody>' + rows + '</tbody>' +
@@ -1134,7 +1134,7 @@ function App() {
             '<h1>送迎日報　' + dateStr + '</h1>' +
             '<h2>' + sectionLabel + '　使用開始時(km)______　(km)　使用終了時(km)______　(km)　______</h2>' +
             carsHtml +
-            '<div style="border:1px solid #999;padding:6px 10px;margin-top:4px;font-size:11px;min-height:36px;">振り替え：</div>' +
+            '<div style="border:1px solid #999;padding:3px 8px;margin-top:2px;font-size:11px;min-height:19px;page-break-inside:avoid;break-inside:avoid;">振り替え：</div>' +
             '</body></html>';
         var w = window.open("", "_blank");
         if (!w) { alert("ポップアップがブロックされています。"); return; }
@@ -1168,20 +1168,20 @@ function App() {
             var hh = tp[0] || ""; var mm = tp[1] || "";
             var bg = colorBgMap[seat.color || ""] || "#fff";
             var circ = CIRC[i] || (i+1);
-            rows += '<tr style="background:' + bg + ';height:24px;">' +
+            rows += '<tr style="background:' + bg + ';height:19px;">' +
                 '<td style="' + B + 'padding:1px 1px;font-size:10px;">&nbsp;</td>' +
-                '<td style="' + BL + 'padding:1px 4px;font-size:13px;text-align:center;font-weight:bold;letter-spacing:0.3em;">' + nm + '</td>' +
-                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">様</td>' +
-                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:13px;text-align:left;">' + hh + '</td>' +
-                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">:</td>' +
-                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">' + mm + '</td>' +
+                '<td style="' + BL + 'padding:1px 4px;font-size:16px;text-align:center;font-weight:bold;letter-spacing:0.5em;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:16px;text-align:left;letter-spacing:0;">様</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:16px;text-align:left;">' + hh + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:16px;text-align:left;">:</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:16px;text-align:left;">' + mm + '</td>' +
                 '<td style="' + Bc + 'background:#fff;padding:1px 1px;font-size:10px;">' + circ + '</td>' +
                 '<td style="' + BnR + 'background:#fff;padding:1px 1px;font-size:10px;">:</td>' +
                 '</tr>';
         }
 
-        return '<div style="display:flex;align-items:baseline;margin:4px 0 1px;"><span style="font-size:9px;font-weight:bold;white-space:nowrap;min-width:9.5em;">【' + label + '】</span><span style="font-size:9px;font-weight:bold;white-space:nowrap;">使用開始時&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(km)&nbsp;&nbsp;使用終了時&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(km)</span></div>' +
-            '<table style="width:100%;border-collapse:collapse;margin-bottom:4px;">' +
+        return '<div style="display:flex;align-items:baseline;margin:2px 0 0px;"><span style="font-size:9px;font-weight:bold;white-space:nowrap;min-width:9.5em;">【' + label + '】</span><span style="font-size:9px;font-weight:bold;white-space:nowrap;">使用開始時&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(km)&nbsp;&nbsp;使用終了時&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(km)</span></div>' +
+            '<table style="width:100%;border-collapse:collapse;margin-bottom:2px;">' +
             '<colgroup>' +
             '<col style="width:5%">' +   /* label */
             '<col style="width:47%">' +  /* name */
@@ -1194,22 +1194,22 @@ function App() {
             '</colgroup>' +
             '<thead>' +
             '<tr>' +
-            '<td colspan="6" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;text-align:center;">' + cname + '（予定）</td>' +
-            '<td colspan="2" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:3px 6px;text-align:center;">' + cname + '（実績）</td>' +
+            '<td colspan="6" style="' + B + 'background:#ffff99;font-weight:bold;font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;">' + cname + '（予定）</td>' +
+            '<td colspan="2" style="' + B + 'background:#ffff99;font-weight:bold;font-size:9px;padding:0px 3px;text-align:center;white-space:nowrap;overflow:hidden;">' + cname + '（実績）</td>' +
             '</tr>' +
-            '<tr style="height:22px;">' +
+            '<tr style="height:19px;">' +
             '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">店発着</td>' +
             '<td colspan="5" style="' + B + 'padding:1px;">&nbsp;</td>' +
             '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">店発着</td>' +
             '<td style="' + B + 'padding:1px;">&nbsp;</td>' +
             '</tr>' +
-            '<tr style="height:22px;text-align:center;">' +
+            '<tr style="height:19px;text-align:center;">' +
             '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">運転</td>' +
-            '<td colspan="5" style="' + B + 'font-size:13px;padding:1px 4px;text-align:center;">' + drv + '</td>' +
+            '<td colspan="5" style="' + B + 'font-size:11px;padding:1px 4px;text-align:center;">' + drv + '</td>' +
             '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">運転</td>' +
             '<td style="' + B + 'padding:1px;">&nbsp;</td>' +
             '</tr>' +
-            '<tr style="height:22px;">' +
+            '<tr style="height:19px;">' +
             '<td style="' + B + 'font-size:8px;padding:0px 1px;text-align:center;">添乗</td>' +
             '<td colspan="5" style="' + B + 'padding:1px;">&nbsp;</td>' +
             '<td style="' + B + 'font-size:7px;padding:0px 1px;text-align:center;white-space:nowrap;">添乗</td>' +
@@ -1250,18 +1250,18 @@ function App() {
             var hh = tp[0] || ""; var mm = tp[1] || "";
             var bg = colorBgMap[seat.color || ""] || "#fff";
             var circ = CIRC[i] || (i+1);
-            pmRows += '<tr style="background:' + bg + ';height:24px;">' +
+            pmRows += '<tr style="background:' + bg + ';height:19px;">' +
                 '<td style="' + B + 'padding:1px 2px;font-size:10px;">&nbsp;</td>' +
-                '<td style="' + BL + 'padding:1px 3px;font-size:13px;text-align:center;font-weight:bold;letter-spacing:0.3em;">' + nm + '</td>' +
-                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">様</td>' +
-                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:13px;text-align:left;">' + hh + '</td>' +
-                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">:</td>' +
-                '<td style="' + Bn + 'padding:1px 0px;font-size:13px;text-align:left;">' + mm + '</td>' +
+                '<td style="' + BL + 'padding:1px 3px;font-size:16px;text-align:center;font-weight:bold;letter-spacing:0.5em;">' + nm + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:16px;text-align:left;letter-spacing:0;">様</td>' +
+                '<td style="' + Bn + 'padding:1px 0px 1px 2px;font-size:16px;text-align:left;">' + hh + '</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:16px;text-align:left;">:</td>' +
+                '<td style="' + Bn + 'padding:1px 0px;font-size:16px;text-align:left;">' + mm + '</td>' +
                 '<td style="' + Bc + 'background:#fff;padding:1px 2px;font-size:10px;">' + circ + '</td>' +
                 '<td style="' + BnR + 'background:#fff;padding:1px;font-size:10px;">:</td>' +
                 '</tr>';
         }
-        var pmTable = '<table style="width:100%;border-collapse:collapse;margin-bottom:4px;"><colgroup>' +
+        var pmTable = '<table style="width:100%;border-collapse:collapse;margin-bottom:2px;"><colgroup>' +
             '<col style="width:5%"><col style="width:47%"><col style="width:5%"><col style="width:6%"><col style="width:3%"><col style="width:5%"><col style="width:3%"><col style="width:26%">' +
             '</colgroup><tbody>' + pmRows + '</tbody></table>';
         var result = buildSectionTable(ci, cname, drvRow, grid, gridKey("AM","迎え"), "お迎え") +
@@ -1269,14 +1269,14 @@ function App() {
             '<div style="border-top:3px solid #000;margin:-2px 0 -1px 0;"></div>' +
             pmTable +
             buildSectionTable(ci, cname, drvRow, grid, gridKey("PM","送り"), "お送り") +
-            '<div style="border:1px solid #aaa;padding:6px 10px;font-size:11px;min-height:28px;margin-top:5px;">振り替え：</div>';
+            '<div style="border:1px solid #aaa;padding:3px 8px;font-size:11px;min-height:19px;margin-top:2px;page-break-inside:avoid;break-inside:avoid;">振り替え：</div>';
         return result;
     }
     function openPrintWindow(title, bodyHtml) {
         var dateStr = buildNipper(selectedDate);
         var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
             '<style>' +
-            'body{font-family:"Meiryo","MS PGothic","Hiragino Kaku Gothic ProN",sans-serif;margin:0;padding:4mm;font-size:11px;box-sizing:border-box;}' +
+            'body{font-family:"Meiryo","MS PGothic","Hiragino Kaku Gothic ProN",sans-serif;margin:0;padding:2mm;font-size:11px;box-sizing:border-box;}' +
             'h1{font-size:14px;font-weight:bold;margin:0 0 3px;letter-spacing:2px;}' +
             'p{margin:5px 0 2px;font-size:11px;font-weight:bold;}' +
             'table{border-collapse:collapse;width:100%;table-layout:fixed;}' +
