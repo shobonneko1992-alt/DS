@@ -264,7 +264,7 @@ function WeekTable(props) {
         }).join("");
 
         return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
-            '<style>body{font-family:sans-serif;margin:8px;font-size:11px;}@page{size:A4 landscape;margin:8mm;}@media print{body{margin:0;}}</style>' +
+            '<style>body{font-family:sans-serif;margin:8px;font-size:11px;}@page{size:A4 landscape;margin:8mm;}@media print{body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style>' +
             '</head><body><h2 style="margin:0 0 6px;font-size:13px;">デイサービス送迎表　' + title + '</h2>' +
             tablesHtml + '</body></html>';
     }
@@ -951,6 +951,8 @@ function App() {
     var [paintColor, setPaintColor] = useState("");
     var [colorEditMode, setColorEditMode] = useState(false);
     var [showDayPrintMenu, setShowDayPrintMenu] = useState(false);
+    var [dayPrintStep, setDayPrintStep] = useState(0); // 0=カラー選択 1=号車選択
+    var [dayPrintColorMode, setDayPrintColorMode] = useState(true);
     var [dragSeatSrc, setDragSeatSrc] = useState(null);
     var [dragSeatDst, setDragSeatDst] = useState(null);
     var seatGridRef = useRef(null);
@@ -980,6 +982,7 @@ function App() {
     var [dayCopySource, setDayCopySource] = useState(null);
     var [dayCopyTargets, setDayCopyTargets] = useState([]);
     var [dayCopyPeriod, setDayCopyPeriod] = useState("both");
+    var [printColorMode, setPrintColorMode] = useState(true);
     var pinchRef = useRef(null);
     var lastDist = useRef(null);
     var startTouches = useRef(null);
@@ -1053,93 +1056,6 @@ function App() {
         catch (e) {
             return false;
         }
-    }
-    function handlePrint() {
-        if (!selectedDate || !grid) return;
-        handlePrintAll();
-    }
-    function handlePrintSection(prd, dir) {
-        if (!selectedDate || !grid) return;
-        var CIRCLES = ["①","②","③","④","⑤","⑥","⑦"];
-        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0" };
-        var dayDrivers = (allGrids[selectedDate] && allGrids[selectedDate].drivers) ? allGrids[selectedDate].drivers : ["","","",""];
-        var gk = gridKey(prd, dir);
-        var dateObj = new Date(selectedDate + "T00:00:00");
-        var DAY_JP2 = ["日","月","火","水","木","金","土"];
-        var dateStr = dateObj.getFullYear() + "年 " + (dateObj.getMonth()+1) + "月 " + dateObj.getDate() + "日（" + DAY_JP2[dateObj.getDay()] + "）";
-        var sectionLabel = (prd === "AM" ? "AM" : "PM") + (dir === "送り" ? "送り【お送り】" : "迎え【お迎え】");
-
-        function buildCarTable(cname, ci) {
-            var drv = dayDrivers[ci] || "";
-            var seats = (grid[gk] || mkGrid())[ci] || [];
-            var maxRows = Math.max(7, seats.filter(function(s){ return s && s.name; }).length);
-            var B = 'border:1px solid #999;';
-            var TD = 'style="' + B + 'padding:2px 4px;font-size:10px;"';
-            var TDc = 'style="' + B + 'padding:2px;font-size:10px;text-align:center;"';
-            var rows = "";
-            for (var i = 0; i < maxRows; i++) {
-                var seat = seats[i] || {};
-                var nm = seat.name ? seat.name + "　様" : "";
-                var tp = (seat.time || "").split(":");
-                var hh = tp[0] || ""; var mm = tp[1] || "";
-                var bg = colorBgMap[seat.color || ""] || "#fff";
-                var circ = CIRCLES[i] || (i+1);
-                rows += '<tr style="background:' + bg + '">' +
-                    '<td ' + TD + '>' + nm + '</td>' +
-                    '<td ' + TDc + '>' + hh + '</td>' +
-                    '<td ' + TDc + '>:</td>' +
-                    '<td ' + TDc + '>' + mm + '</td>' +
-                    '<td ' + TDc + '>' + circ + '</td>' +
-                    '<td style="' + B + 'background:#fff;padding:2px;text-align:center;font-size:10px;">' + circ + '</td>' +
-                    '<td style="' + B + 'background:#fff;padding:2px;min-width:28px;"></td>' +
-                    '<td style="' + B + 'background:#fff;padding:2px;text-align:center;font-size:10px;">:</td>' +
-                    '<td style="' + B + 'background:#fff;padding:2px;min-width:28px;"></td>' +
-                    '</tr>';
-            }
-            return '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;break-inside:avoid;">' +
-                '<colgroup>' +
-                '<col style="width:26%"><col style="width:5%"><col style="width:3%"><col style="width:5%"><col style="width:5%">' +
-                '<col style="width:6%"><col style="width:22%"><col style="width:3%"><col style="width:25%">' +
-                '</colgroup>' +
-                '<thead>' +
-                '<tr>' +
-                '<td colspan="5" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:0px 3px;">' + cname + '（予定）</td>' +
-                '<td colspan="4" style="' + B + 'background:#ffff99;font-weight:bold;font-size:11px;padding:0px 3px;">' + cname + '（実績）</td>' +
-                '</tr>' +
-                '<tr style="height:19px;">' +
-                '<td style="' + B + 'font-size:11px;padding:0px 3px;">店発着</td><td colspan="4" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
-                '<td style="' + B + 'font-size:11px;padding:0px 3px;">店発着</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
-                '</tr>' +
-                '<tr style="height:19px;text-align:center;">' +
-                '<td style="' + B + 'font-size:11px;padding:0px 3px;">運転</td><td colspan="4" style="' + B + 'font-size:9px;padding:0px 3px;text-align:center;overflow:hidden;">' + drv + '</td>' +
-                '<td style="' + B + 'font-size:11px;padding:0px 3px;">運転</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
-                '</tr>' +
-                '<tr style="height:19px;">' +
-                '<td style="' + B + 'font-size:11px;padding:0px 3px;">添乗</td><td colspan="4" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
-                '<td style="' + B + 'font-size:11px;padding:0px 3px;">添乗</td><td colspan="3" style="' + B + 'padding:0px 3px;">&nbsp;</td>' +
-                '</tr>' +
-                '</thead>' +
-                '<tbody>' + rows + '</tbody>' +
-                '</table>';
-        }
-
-        var carsHtml = carNames.map(function(cname, ci){ return buildCarTable(cname, ci); }).join("");
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>送迎日報</title>' +
-            '<style>' +
-            'body{font-family:"Meiryo","MS PGothic","Hiragino Kaku Gothic ProN",sans-serif;margin:12px;font-size:11px;}' +
-            'h1{font-size:15px;font-weight:bold;margin:0 0 6px;}' +
-            'h2{font-size:12px;font-weight:bold;margin:0 0 8px;border-bottom:1px solid #999;padding-bottom:2px;}' +
-            '@media print{body{margin:6px;}}' +
-            '</style></head><body>' +
-            '<h1>送迎日報　' + dateStr + '</h1>' +
-            '<h2>' + sectionLabel + '　使用開始時(km)______　(km)　使用終了時(km)______　(km)　______</h2>' +
-            carsHtml +
-            '<div style="border:1px solid #999;padding:3px 8px;margin-top:2px;font-size:11px;min-height:19px;page-break-inside:avoid;break-inside:avoid;">振り替え：</div>' +
-            '</body></html>';
-        var w = window.open("", "_blank");
-        if (!w) { alert("ポップアップがブロックされています。"); return; }
-        w.document.write(html); w.document.close(); w.focus();
-        setTimeout(function() { w.print(); }, 400);
     }
     var grid = selectedDate ? (allGrids[selectedDate] || mkDay()) : null;
     var gk = gridKey(period, direction);
@@ -1272,7 +1188,8 @@ function App() {
             '<div style="border:1px solid #aaa;padding:3px 8px;font-size:11px;min-height:19px;margin-top:2px;page-break-inside:avoid;break-inside:avoid;">振り替え：</div>';
         return result;
     }
-    function openPrintWindow(title, bodyHtml) {
+    function openPrintWindow(title, bodyHtml, colorMode) {
+        var isColor = colorMode !== undefined ? colorMode : printColorMode;
         var dateStr = buildNipper(selectedDate);
         var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
             '<style>' +
@@ -1281,11 +1198,12 @@ function App() {
             'p{margin:5px 0 2px;font-size:11px;font-weight:bold;}' +
             'table{border-collapse:collapse;width:100%;table-layout:fixed;}' +
             'td{font-size:10px;padding:1px 3px;overflow:hidden;}' +
-            '@media print{' +
+            (isColor ? '' : '*{background:#fff!important;color:#000!important;border-color:#000!important;}') +
+            '@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
             '@page{size:A4 portrait;margin:4mm;}' +
             'body{padding:2mm;}' +
             '}' +
-            '</style></head><body>' +
+            '</style></head><body>' + +
             '<h1>送迎日報　　' + dateStr + '</h1>' +
             bodyHtml +
             '</body></html>';
@@ -1294,18 +1212,18 @@ function App() {
         w.document.write(html); w.document.close(); w.focus();
         setTimeout(function() { w.print(); }, 400);
     }
-    function handlePrintAll() {
+    function handlePrintAll(colorMode) {
         if (!selectedDate || !grid) return;
         var body = carNames.map(function(cname, ci) {
             return buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
         }).join("");
-        openPrintWindow("送迎日報　" + selectedDate, body);
+        openPrintWindow("送迎日報　" + selectedDate, body, colorMode);
     }
-    function handlePrintCar(ci) {
+    function handlePrintCar(ci, colorMode) {
         if (!selectedDate || !grid) return;
         var cname = carNames[ci];
         var body = buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
-        openPrintWindow("送迎日報　" + selectedDate + "　" + cname, body);
+        openPrintWindow("送迎日報　" + selectedDate + "　" + cname, body, colorMode !== undefined ? colorMode : printColorMode);
     }
     var assigned = useMemo(function () {
         var s = new Set();
@@ -2354,11 +2272,7 @@ function App() {
                         onSave: handleSave,
                         onShowLog: function(){ setShowSaveLog(true); },
                         style: { marginLeft: 6, padding: "4px 10px", borderRadius: 16, fontSize: 11 },
-                    }),
-                    selectedDate && React.createElement("button", { onClick: handlePrint, style: {
-                            padding: "4px 10px", borderRadius: 16, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
-                            background: "rgba(255,255,255,.2)", color: "white",
-                        } }, "\uD83D\uDDA8 \u5370\u5237")),
+                    })),
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 2, background: "rgba(255,255,255,.1)", borderRadius: 20, padding: "3px 6px", flexShrink: 0 } },
                     React.createElement("button", { onClick: handleZoomDown, style: { background: "none", border: "none", color: "white", fontSize: 15, cursor: "pointer", padding: "0 2px", fontWeight: 700 } }, "\u2212"),
                     React.createElement("span", { style: { fontSize: 10, color: "rgba(255,255,255,.8)", minWidth: 28, textAlign: "center" } },
@@ -2945,7 +2859,7 @@ function App() {
                                 })),
                             // ── 印刷ボタン ──
                             React.createElement("div", { style: { position: "relative", marginLeft: "auto" } },
-                                React.createElement("button", { onClick: function() { setShowDayPrintMenu(function(v){ return !v; }); }, style: {
+                                React.createElement("button", { onClick: function() { setShowDayPrintMenu(function(v){ return !v; }); setDayPrintStep(0); }, style: {
                                     padding: "4px 12px", borderRadius: 50, border: "none", cursor: "pointer",
                                     fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
                                     background: "#e2e8f0", color: "#1e3a5f",
@@ -2954,21 +2868,37 @@ function App() {
                                     position: "absolute", top: "calc(100% + 4px)", right: 0,
                                     background: "white", border: "1.5px solid #e0e7ef", borderRadius: 10,
                                     boxShadow: "0 4px 16px rgba(0,0,0,.12)", zIndex: 200,
-                                    overflow: "hidden", minWidth: 150,
+                                    overflow: "hidden", minWidth: 160,
                                 } },
-                                    React.createElement("button", { onClick: function() { handlePrintCar(0); setShowDayPrintMenu(false); }, style: {
-                                        display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
-                                        background: "#f0f4f8", border: "none", borderBottom: "1px solid #e0e7ef",
-                                        fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
-                                    } }, "🚐 " + carNames[0]),
-                                    carNames.slice(1).map(function(cname, i) {
-                                        var ci = i + 1;
-                                        return React.createElement("button", { key: ci, onClick: function() { handlePrintCar(ci); setShowDayPrintMenu(false); }, style: {
+                                    dayPrintStep === 0 ? [
+                                        React.createElement("div", { key: "title", style: { padding: "8px 16px", fontSize: 11, color: "#94a3b8", fontWeight: 700, borderBottom: "1px solid #f0f4f8" } }, "印刷カラー選択"),
+                                        React.createElement("button", { key: "color", onClick: function() { setDayPrintColorMode(true); setDayPrintStep(1); }, style: {
                                             display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
                                             background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                                            fontSize: 13, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                                        } }, "🎨 カラー"),
+                                        React.createElement("button", { key: "mono", onClick: function() { setDayPrintColorMode(false); setDayPrintStep(1); }, style: {
+                                            display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                            background: "white", border: "none",
+                                            fontSize: 13, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                                        } }, "⬜ 白黒"),
+                                    ] : [
+                                        React.createElement("div", { key: "back", style: { padding: "8px 16px", fontSize: 11, color: "#94a3b8", fontWeight: 700, borderBottom: "1px solid #f0f4f8", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" },
+                                            onClick: function() { setDayPrintStep(0); } }, "‹ " + (dayPrintColorMode ? "🎨 カラー" : "⬜ 白黒")),
+                                        React.createElement("div", { key: "title2", style: { padding: "8px 16px", fontSize: 11, color: "#94a3b8", fontWeight: 700, borderBottom: "1px solid #f0f4f8" } }, "号車を選択"),
+                                        React.createElement("button", { key: "all", onClick: function() { handlePrintAll(dayPrintColorMode); setShowDayPrintMenu(false); }, style: {
+                                            display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                            background: "#f8fafc", border: "none", borderBottom: "1px solid #f0f4f8",
                                             fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
-                                        } }, "🚐 " + cname);
-                                    })
+                                        } }, "🚐 全号車"),
+                                        carNames.map(function(cname, ci) {
+                                            return React.createElement("button", { key: ci, onClick: function() { handlePrintCar(ci, dayPrintColorMode); setShowDayPrintMenu(false); }, style: {
+                                                display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
+                                                background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
+                                                fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
+                                            } }, "🚐 " + cname);
+                                        }),
+                                    ]
                                 )),
                             dups.size > 0 && (React.createElement("div", { style: { background: "#fff3e0", border: "1.5px solid #ffb74d", borderRadius: 8, padding: "3px 8px", fontSize: 11, color: "#e65100", fontWeight: 600 } }, "\u26A0\uFE0F \u91CD\u8907")))),
                     dupDetails.length > 0 && (React.createElement("div", { style: { marginBottom: 8, background: "#fff3e0", border: "2px solid #ffb74d", borderRadius: 10, padding: "10px 14px" } },
