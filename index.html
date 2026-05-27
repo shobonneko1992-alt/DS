@@ -1215,7 +1215,9 @@ function App() {
     function handlePrintAll(colorMode) {
         if (!selectedDate || !grid) return;
         var body = carNames.map(function(cname, ci) {
-            return buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList);
+            return '<div style="page-break-after:always;break-after:page;">' +
+                buildOneCarReport(ci, cname, selectedDate, grid, allGrids, driverList) +
+                '</div>';
         }).join("");
         openPrintWindow("送迎日報　" + selectedDate, body, colorMode);
     }
