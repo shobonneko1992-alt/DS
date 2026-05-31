@@ -114,14 +114,13 @@ function getMondayKey(date) {
 var DAY_JP = ["日","月","火","水","木","金","土"];
 var WEEK_SECTIONS = [
     { label: "AM 迎え", period: "AM", dir: "迎え" },
-    { label: "PM 迎え", period: "PM", dir: "迎え" },
     { label: "AM 送り", period: "AM", dir: "送り" },
-    { label: "PM 送り", period: "PM", dir: "送り" },
+    { label: "PM 迎え", period: "PM", dir: "迎え" },
 ];
 var COLOR_BG_MAP = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
 
 function WeekTable(props) {
-    var allGrids = props.allGrids, setAllGrids = props.setAllGrids, selectedDate = props.selectedDate, carNames = props.carNames, drivers = props.drivers, driverList = props.driverList, absent = props.absent;
+    var allGrids = props.allGrids, setAllGrids = props.setAllGrids, selectedDate = props.selectedDate, carNames = props.carNames, drivers = props.drivers, driverList = props.driverList, absent = props.absent, people = props.people || [];
     var [section, setSection] = useState(0);
     var sec = WEEK_SECTIONS[section];
 
@@ -220,55 +219,166 @@ function WeekTable(props) {
         var fri = new Date(mon.getTime()); fri.setDate(fri.getDate() + 4);
         var title = (mon.getMonth()+1) + "/" + mon.getDate() + "〜" + (fri.getMonth()+1) + "/" + fri.getDate();
 
+        var isAmMukae = sections.length === 1 && sections[0].period === "AM" && sections[0].dir === "迎え";
+
         var tablesHtml = sections.map(function(sec) {
-            var rows = props.carNames.map(function(cname, ci) {
-                var driverCells = weekDates.map(function(wd) {
-                    return '<td style="background:#e8f0fe;font-size:11px;padding:0px 3px;border:1px solid #c0ccda;text-align:center;">—</td>';
-                }).join("");
-                var seatRowsHtml = Array(SEAT_COUNT).fill(null).map(function(_, si) {
-                    var cells = weekDates.map(function(wd) {
+            var isAmOkuri = sec.period === "AM" && sec.dir === "送り";
+            var isPmMukae = sec.period === "PM" && sec.dir === "迎え";
+
+            // ========== AM迎え設定 変更禁止 ==========
+            var fs_head = isAmMukae ? 12 : 8;
+            var fs_name = isAmMukae ? [16, 18, 20] : [9, 9, 9];
+            var fs_time = isAmMukae ? 14 : 9;
+            var fs_label = isAmMukae ? 9 : 7;
+            var pad_head = isAmMukae ? "4px 2px" : "2px 1px";
+            // ========== AM迎え設定 ここまで ==========
+
+            var colW = isAmMukae ? "11.776%" : "18.4%";
+            var leftW = isAmMukae ? "1.6%" : "4%";
+
+            var headCells = weekDates.map(function(wd) {
+                return '<th style="width:' + colW + ';background:#1e3a5f;color:white;font-size:' + fs_head + 'px;padding:' + pad_head + ';text-align:center;border:1px solid #374151;word-break:break-all;line-height:1.3;">' + (isPmMukae ? '' : wd.label) + '</th>';
+            }).join("");
+
+            var thead = isPmMukae
+                ? '<thead><tr><th style="width:' + leftW + ';background:#1e3a5f;border:1px solid #374151;"></th><th style="width:' + leftW + ';background:#1e3a5f;border:1px solid #374151;"></th>' + headCells + '</tr></thead>'
+                : '<thead><tr>' +
+                    '<th style="width:' + leftW + ';background:#1e3a5f;color:white;font-size:' + fs_label + 'px;padding:' + pad_head + ';border:1px solid #374151;text-align:center;writing-mode:vertical-rl;text-orientation:upright;">' + (isAmOkuri ? '' : '運転者') + '</th>' +
+                    '<th style="width:' + leftW + ';background:#1e3a5f;color:white;font-size:' + fs_label + 'px;padding:' + pad_head + ';border:1px solid #374151;text-align:center;writing-mode:vertical-rl;text-orientation:upright;">' + (isAmOkuri ? '' : '号車') + '</th>' +
+                    headCells + '</tr></thead>';
+
+            var tbody = props.carNames.map(function(cname, ci) {
+                var drName = "";
+                for (var wi = 0; wi < weekDates.length; wi++) {
+                    var wdKey = weekDates[wi].key;
+                    var dayDrv = allGrids[wdKey] && allGrids[wdKey].drivers && allGrids[wdKey].drivers[ci];
+                    if (dayDrv) { drName = dayDrv; break; }
+                }
+                return Array(SEAT_COUNT).fill(null).map(function(_, si) {
+                    var drvCell = si === 0 ? '<td rowspan="' + SEAT_COUNT + '" style="width:' + leftW + ';background:#1e3a5f;color:white;font-size:' + (drName.length >= 4 ? fs_label : fs_label + 1) + 'px;font-weight:700;padding:2px 0;border:1px solid #374151;text-align:center;vertical-align:middle;writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0.05em;">' + (drName || "—") + '</td>' : '';
+                    var carCell = si === 0 ? '<td rowspan="' + SEAT_COUNT + '" style="width:' + leftW + ';background:#2d6a9f;color:white;font-size:' + (cname.length >= 4 ? fs_label : fs_label + 1) + 'px;font-weight:700;padding:2px 0;border:1px solid #374151;text-align:center;vertical-align:middle;writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0.05em;">' + cname + '</td>' : '';
+                    var dateCells = weekDates.map(function(wd) {
                         var dayGrid = allGrids[wd.key];
-                        var secGk = gridKey(sec.period, sec.dir);
-                        var seat = dayGrid && dayGrid[secGk] && dayGrid[secGk][ci] && dayGrid[secGk][ci][si];
+                        var rGk = gridKey(sec.period, sec.dir);
+                        var seat = dayGrid && dayGrid[rGk] && dayGrid[rGk][ci] && dayGrid[rGk][ci][si];
                         var name = seat ? seat.name : "";
                         var time = seat ? seat.time : "";
-                        var seatNo = seat ? seat.seatNo : "";
-                        var bg = colorBgMap[seat && seat.color || ""] || (name ? "#f1f8e9" : "#fff");
-                        return '<td style="background:' + bg + ';font-size:11px;padding:0px 3px;border:1px solid #e0e7ef;">' +
-                            (name ? '<b>' + name + '</b>' + (time ? '<br><span style="color:#555;font-size:9px;">' + time + (seatNo ? " " + seatNo : "") + '</span>' : '') : '<span style="color:#ccc;">—</span>') +
-                            '</td>';
+                        var color = seat ? (seat.color || "") : "";
+                        var bg = colorBgMap[color] || (name ? "#f1f8e9" : "#fafafa");
+                        var surname = getSurname(name);
+                        var nfs = surname.length >= 4 ? fs_name[0] : surname.length === 3 ? fs_name[1] : fs_name[2];
+                        var timeStr = (!isAmOkuri && !isAmMukae) ? (time || "") : "";
+
+                        var cellContent;
+                        if (!surname) {
+                            cellContent = '<span style="color:#ddd;font-size:' + fs_time + 'px;">—</span>';
+                        } else if (isAmMukae) {
+                            // AM迎え: 名前の下に時間（変更禁止）
+                            cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:' + nfs + 'px;line-height:1.2;letter-spacing:0.15em;text-align:center;">' + surname + '</div>' +
+                                (timeStr ? '<div style="color:#1a1a1a;font-size:' + fs_time + 'px;text-align:center;">' + timeStr + '</div>' : '');
+                        } else if (isAmOkuri) {
+                            // AM送り: 名前のみ
+                            cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:8px;line-height:1;text-align:center;letter-spacing:0.1em;">' + surname + '</div>';
+                        } else {
+                            // PM迎え: 名前と時間を横並び
+                            cellContent = '<div style="display:flex;align-items:center;justify-content:center;width:100%;">' +
+                                '<span style="font-weight:700;color:#1e3a5f;font-size:13px;display:inline-block;width:3em;text-align:right;margin-right:3em;">' + surname + '</span>' +
+                                (timeStr ? '<span style="color:#1a1a1a;font-size:13px;display:inline-block;width:4em;text-align:left;">' + timeStr + '</span>' : '<span style="display:inline-block;width:4em;"></span>') +
+                                '</div>';
+                        }
+
+                        return '<td style="background:' + bg + ';border:1px solid #e0e7ef;padding:1px;text-align:center;vertical-align:middle;">' +
+                            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;">' +
+                            cellContent + '</div></td>';
                     }).join("");
-                    return '<tr>' + '<td style="border:1px solid #e0e7ef;background:#f8fafc;"></td>' + cells + '</tr>';
+
+                    var borderBottom = si === SEAT_COUNT - 1 ? "border-bottom:2px solid #1e3a5f;" : "";
+                    return '<tr style="' + borderBottom + '">' + drvCell + carCell + dateCells + '</tr>';
                 }).join("");
-                var totalCells = weekDates.map(function(wd) {
-                    var dayGrid = allGrids[wd.key];
-                    var secGk2 = gridKey(sec.period, sec.dir);
-                    var count = 0;
-                    if (dayGrid && dayGrid[secGk2] && dayGrid[secGk2][ci]) {
-                        dayGrid[secGk2][ci].forEach(function(s) { if (s && s.name) count++; });
+            }).join("");
+
+            var ufs = isAmMukae ? 18 : 9;
+            var uLabelFs = isAmMukae ? 13 : 8;
+            var unassignedCells = weekDates.map(function(wd) {
+                var dayGrid = allGrids[wd.key];
+                var tGk = gridKey(sec.period, sec.dir);
+                var assignedNames = new Set();
+                if (dayGrid && dayGrid[tGk]) {
+                    dayGrid[tGk].forEach(function(car) { if (!car) return; car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); }); });
+                }
+                var dayIdx = [null,0,1,2,3,4,null][new Date(wd.key + "T00:00:00").getDay()];
+                var unassigned = (people || []).filter(function(p) {
+                    if (!p || !p.name || assignedNames.has(p.name)) return false;
+                    if (p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0) {
+                        var dp = p.dayPeriods[dayIdx]; return dp && dp.indexOf(sec.period) >= 0;
                     }
-                    return '<td style="background:#f0f4f8;font-size:10px;font-weight:bold;padding:2px 4px;border:1px solid #c0ccda;text-align:center;color:' + (count > 0 ? "#1e3a5f" : "#aaa") + ';">' + count + '名</td>';
-                }).join("");
-                return '<tr><td rowspan="' + (SEAT_COUNT + 2) + '" style="background:#1e3a5f;color:white;font-weight:bold;font-size:11px;padding:4px;text-align:center;border:1px solid #374151;vertical-align:middle;">' + cname + '</td>' +
-                    driverCells + '</tr>' + seatRowsHtml +
-                    '<tr style="border-bottom:3px solid #1e3a5f;"><td style="background:#f0f4f8;font-size:10px;font-weight:bold;padding:2px 4px;border:1px solid #c0ccda;text-align:center;">合計</td>' + totalCells + '</tr>';
+                    return Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0 && Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
+                }).map(function(p) { return getSurname(p.name); });
+                return '<td style="background:#fafafa;font-size:' + ufs + 'px;padding:' + (isAmMukae ? "6px" : "2px") + ';border:1px solid #e0e7ef;text-align:center;">' +
+                    (unassigned.length > 0 ? '<span style="font-weight:700;color:#c05300;">' + unassigned.join("　") + '</span>' : '<span style="color:#ddd;">—</span>') + '</td>';
             }).join("");
-            var headCells = weekDates.map(function(wd) {
-                return '<th style="background:#1e3a5f;color:white;font-size:10px;padding:4px 2px;border:1px solid #374151;text-align:center;">' + wd.label + '</th>';
+
+            var emptyCells = weekDates.map(function(wd) {
+                return '<td style="background:#fafafa;font-size:' + ufs + 'px;padding:2px;border:1px solid #e0e7ef;text-align:center;"><span style="color:#ddd;">—</span></td>';
             }).join("");
-            return '<div style="margin-bottom:12px;">' +
-                '<div style="background:#2d6a9f;color:white;font-weight:bold;font-size:12px;padding:4px 8px;border-radius:4px 4px 0 0;">' + sec.label + '</div>' +
-                '<table style="width:100%;border-collapse:collapse;">' +
-                '<thead><tr><th style="background:#1e3a5f;color:white;font-size:11px;padding:4px;border:1px solid #374151;width:50px;">号車</th>' + headCells + '</tr></thead>' +
-                '<tbody>' + rows + '</tbody></table></div>';
+            var unassignedRow = isAmOkuri ? "" :
+                '<tr><td colspan="2" style="background:#4a6fa5;color:white;font-size:' + uLabelFs + 'px;font-weight:700;padding:2px;border:1px solid #374151;text-align:center;">その他</td>' + unassignedCells + '</tr>' +
+                '<tr><td colspan="2" style="background:#4a6fa5;padding:2px;border:1px solid #374151;"></td>' + emptyCells + '</tr>';
+
+            var totalCells = weekDates.map(function(wd) {
+                var dayGrid = allGrids[wd.key];
+                var tGk = gridKey(sec.period, sec.dir);
+                var total = 0; var assignedNames = new Set();
+                if (dayGrid && dayGrid[tGk]) {
+                    dayGrid[tGk].forEach(function(car) { if (!car) return; car.forEach(function(s) { if (s && s.name) { total++; assignedNames.add(s.name); } }); });
+                }
+                var dayIdx = [null,0,1,2,3,4,null][new Date(wd.key + "T00:00:00").getDay()];
+                total += (people || []).filter(function(p) {
+                    if (!p || !p.name || assignedNames.has(p.name)) return false;
+                    if (p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0) {
+                        var dp = p.dayPeriods[dayIdx]; return dp && dp.indexOf(sec.period) >= 0;
+                    }
+                    return Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0 && Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
+                }).length;
+                var tfs = isAmMukae ? 20 : 10;
+                return '<td style="background:#1e3a5f;color:white;font-size:' + tfs + 'px;font-weight:800;padding:' + (isAmMukae ? "6px" : "2px") + ';border:1px solid #374151;text-align:center;">' + (total > 0 ? total + "名" : "0") + '</td>';
+            }).join("");
+
+            var tLabelFs = isAmMukae ? 18 : 9;
+            var totalRow = isAmOkuri ? "" : '<tr style="border-top:3px solid #1e3a5f;"><td colspan="2" style="background:#1e3a5f;color:white;font-size:' + tLabelFs + 'px;font-weight:700;padding:2px;border:1px solid #374151;text-align:center;">合計</td>' + totalCells + '</tr>';
+
+            var secFlex = isAmOkuri ? "flex:1;" : (isPmMukae ? "flex:1.5;" : "flex:1;");
+            return '<div class="sec-wrap" style="' + secFlex + 'display:flex;flex-direction:column;">' +
+                '<div style="background:#2d6a9f;color:white;font-weight:700;font-size:9px;padding:1px 4px;line-height:1.4;flex-shrink:0;">' + sec.label + '</div>' +
+                '<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex:1;height:100%;">' +
+                thead + '<tbody style="height:100%;">' + tbody + unassignedRow + totalRow + '</tbody></table></div>';
         }).join("");
 
         return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
-            '<style>body{font-family:sans-serif;margin:8px;font-size:11px;}@page{size:A4 landscape;margin:8mm;}@media print{body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style>' +
-            '</head><body><h2 style="margin:0 0 6px;font-size:13px;">デイサービス送迎表　' + title + '</h2>' +
-            tablesHtml + '</body></html>';
+            '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">' +
+            '<style>' +
+            'html,body{margin:0;padding:0;box-sizing:border-box;}' +
+            'body{font-family:"Noto Sans JP","Meiryo","MS PGothic",sans-serif;font-size:9px;background:#f0f0f0;display:flex;justify-content:center;padding:20px;box-sizing:border-box;}' +
+            'h2{margin:0 0 2mm;font-size:11px;font-weight:bold;flex-shrink:0;padding-left:1em;}' +
+            'table{width:100%;border-collapse:collapse;table-layout:fixed;}' +
+            'td,th{padding:1px;vertical-align:middle;overflow:hidden;}' +
+            '.page-container{width:210mm;height:297mm;background:white;padding:8mm;box-shadow:0 0 10px rgba(0,0,0,0.1);box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;}' +
+            '.week-wrap{flex:1;display:flex;flex-direction:column;gap:2mm;height:100%;}' +
+            '.sec-wrap{min-height:0;}' +
+            '@page{size:A4 portrait;margin:0;}' +
+            '@media print{' +
+            'body{background:none;padding:0;}' +
+            '.page-container{box-shadow:none;padding:8mm;}' +
+            '*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+            '}' +
+            '</style>' +
+            '</head><body>' +
+            '<div class="page-container">' +
+            '<h2>週間予定表　' + title + '</h2>' +
+            '<div class="week-wrap">' + tablesHtml + '</div>' +
+            '</div>' +
+            '</body></html>';
     }
-
     function printWeek(sections) {
         var html = buildWeekPrintHtml(sections);
         var w = window.open("", "_blank");
@@ -332,11 +442,11 @@ function WeekTable(props) {
                         background: "white", border: "none", borderBottom: "1px solid #f0f4f8",
                         fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
                     } }, "🌅 AM 迎え"),
-                    React.createElement("button", { onClick: function() { printWeek([WEEK_SECTIONS[1]]); setShowPrintMenu(false); }, style: {
+                    React.createElement("button", { onClick: function() { printWeek([WEEK_SECTIONS[1], WEEK_SECTIONS[2]]); setShowPrintMenu(false); }, style: {
                         display: "block", width: "100%", padding: "10px 16px", textAlign: "left",
                         background: "white", border: "none",
                         fontSize: 12, fontWeight: 700, color: "#1e3a5f", cursor: "pointer",
-                    } }, "🌇 PM 迎え")))),
+                    } }, "🌇 AM送り＋PM迎え")))),
         // Table（ピンチ／ズーム対応ラッパー）
         React.createElement("div", {
             ref: pinchRef,
@@ -434,7 +544,7 @@ function WeekTable(props) {
                                         overflowWrap: "break-word", wordBreak: "break-all",
                                         lineHeight: 1.2, textAlign: "center",
                                     } }, surname),
-                                    (time || seatNo) && React.createElement("div", { style: { color: "#718096", fontSize: 8, textAlign: "center" } }, [time, seatNo].filter(Boolean).join(" "))
+                                    (time || seatNo) && React.createElement("div", { style: { color: "#718096", fontSize: 8, textAlign: "center" } }, (sec.dir === "迎え" || (sec.period === "AM" && sec.dir === "送り") ? [time] : [time, seatNo]).filter(Boolean).join(" "))
                                 ) : React.createElement("div", { style: { color: "#ddd", fontSize: 9, textAlign: "center" } }, "—"));
                         });
                         return React.createElement("tr", { key: "seat-" + ci + "-" + si },
@@ -450,6 +560,65 @@ function WeekTable(props) {
                             row.props.children);
                     });
                 }),
+                // ── その他行（座席未配置の対象者）──
+                React.createElement("tr", { style: { borderTop: "2px solid #1e3a5f" } },
+                    React.createElement("td", { colSpan: 2, style: {
+                        background: "#4a6fa5", color: "white", fontSize: 8, fontWeight: 700,
+                        padding: "4px 2px", border: "1px solid #374151",
+                        textAlign: "center", whiteSpace: "nowrap",
+                    } }, "その他"),
+                    weekDates.map(function(wd) {
+                        var dayGrid = allGrids[wd.key];
+                        var tGk = gridKey(sec.period, sec.dir);
+                        var assignedNames = new Set();
+                        if (dayGrid && dayGrid[tGk]) {
+                            dayGrid[tGk].forEach(function(car) {
+                                if (!car) return;
+                                car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); });
+                            });
+                        }
+                        var dateObj = new Date(wd.key + "T00:00:00");
+                        var dow = dateObj.getDay();
+                        var DAY_IDX = [null, 0, 1, 2, 3, 4, null];
+                        var dayIdx = DAY_IDX[dow];
+                        var unassigned = people.filter(function(p) {
+                            if (!p || !p.name) return false;
+                            if (assignedNames.has(p.name)) return false;
+                            var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
+                            if (hasDayPeriods) {
+                                var dp = p.dayPeriods[dayIdx];
+                                if (!dp) return false;
+                                return dp.indexOf(sec.period) >= 0;
+                            }
+                            var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
+                            var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
+                            return inDay && inPeriod;
+                        }).map(function(p) { return p.name; });
+                        return React.createElement("td", { key: wd.key, style: {
+                            background: "#fafafa",
+                            fontSize: 9, padding: "2px 2px",
+                            border: "1px solid #e0e7ef", textAlign: "center",
+                            verticalAlign: "middle", lineHeight: 1.4,
+                        } }, unassigned.length > 0
+                            ? React.createElement("div", { style: { fontWeight: 700, color: "#7c4a00", whiteSpace: "normal", wordBreak: "break-all" } },
+                                unassigned.map(function(n) { return getSurname(n); }).join("　")
+                              )
+                            : React.createElement("div", { style: { color: "#ddd", fontSize: 9 } }, "—")
+                        );
+                    })),
+                // ── その他行2（同条件・2行目）──
+                React.createElement("tr", null,
+                    React.createElement("td", { colSpan: 2, style: {
+                        background: "#4a6fa5",
+                        padding: "4px 2px", border: "1px solid #374151",
+                    } }, ""),
+                    weekDates.map(function(wd) {
+                        return React.createElement("td", { key: wd.key, style: {
+                            background: "#fafafa", fontSize: 9, padding: "2px 2px",
+                            border: "1px solid #e0e7ef", textAlign: "center",
+                            verticalAlign: "middle", lineHeight: 1.4,
+                        } }, React.createElement("div", { style: { color: "#ddd", fontSize: 9 } }, "—"));
+                    })),
                 // ── 4台分の合計行（最下部に1行だけ）──
                 React.createElement("tr", { style: { borderTop: "3px solid #1e3a5f" } },
                     React.createElement("td", { colSpan: 2, style: {
@@ -467,6 +636,32 @@ function WeekTable(props) {
                                 car.forEach(function(s) { if (s && s.name) total++; });
                             });
                         }
+                        // その他（未配置）人数も加算
+                        var assignedNames = new Set();
+                        if (dayGrid && dayGrid[tGk]) {
+                            dayGrid[tGk].forEach(function(car) {
+                                if (!car) return;
+                                car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); });
+                            });
+                        }
+                        var dateObj = new Date(wd.key + "T00:00:00");
+                        var dow = dateObj.getDay();
+                        var DAY_IDX = [null, 0, 1, 2, 3, 4, null];
+                        var dayIdx = DAY_IDX[dow];
+                        var unassignedCount = people.filter(function(p) {
+                            if (!p || !p.name) return false;
+                            if (assignedNames.has(p.name)) return false;
+                            var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
+                            if (hasDayPeriods) {
+                                var dp = p.dayPeriods[dayIdx];
+                                if (!dp) return false;
+                                return dp.indexOf(sec.period) >= 0;
+                            }
+                            var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
+                            var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
+                            return inDay && inPeriod;
+                        }).length;
+                        total += unassignedCount;
                         return React.createElement("td", { key: wd.key, style: {
                             background: "#1e3a5f", color: "white",
                             fontSize: 11, fontWeight: 800, padding: "4px 2px",
@@ -2420,7 +2615,7 @@ function App() {
                                 })()))),
                         React.createElement("button", { onClick: function() { setShowWeekTable(false); }, style: { background: "rgba(255,255,255,.2)", border: "none", color: "white", borderRadius: 20, padding: "4px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "✕ 閉じる")),
                     React.createElement("div", { style: { flex: 1, overflowX: "hidden", overflowY: "auto" } },
-                        React.createElement(WeekTable, { allGrids: allGrids, setAllGrids: setAllGrids, selectedDate: selectedDate || toKey(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate()), carNames: carNames, drivers: drivers, driverList: driverList, absent: absent }))))),
+                        React.createElement(WeekTable, { allGrids: allGrids, setAllGrids: setAllGrids, selectedDate: selectedDate || toKey(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate()), carNames: carNames, drivers: drivers, driverList: driverList, absent: absent, people: people }))))),
             showDayCopy && (React.createElement("div", { style: modalOverlay },
                 React.createElement("div", { style: Object.assign({}, modalBox, { maxHeight: "92vh", overflowY: "auto" }) },
                     React.createElement("div", { style: modalTitle }, "\uD83D\uDCC6 1\u65E5\u5206\u3092\u30B3\u30D4\u30FC"),
