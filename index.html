@@ -267,15 +267,15 @@ function WeekTable(props) {
                         var bg = colorBgMap[color] || (name ? "#f1f8e9" : "#fafafa");
                         var surname = getSurname(name);
                         var nfs = surname.length >= 4 ? fs_name[0] : surname.length === 3 ? fs_name[1] : fs_name[2];
-                        var timeStr = (!isAmOkuri && !isAmMukae) ? (time || "") : "";
+                        var timeStr = (!isAmOkuri) ? (time || "") : "";
 
                         var cellContent;
                         if (!surname) {
                             cellContent = '<span style="color:#ddd;font-size:' + fs_time + 'px;">—</span>';
                         } else if (isAmMukae) {
-                            // AM迎え: 名前の下に時間（変更禁止）
-                            cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:' + nfs + 'px;line-height:1.2;letter-spacing:0.15em;text-align:center;">' + surname + '</div>' +
-                                (timeStr ? '<div style="color:#1a1a1a;font-size:' + fs_time + 'px;text-align:center;">' + timeStr + '</div>' : '');
+                            // AM迎え: 名前の下に時間
+                            cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:' + Math.round(nfs * 0.8) + 'px;line-height:1.2;letter-spacing:0.15em;text-align:center;">' + surname + '</div>' +
+                                (timeStr ? '<div style="color:#1a1a1a;font-size:' + Math.round(fs_time * 1.2) + 'px;text-align:center;">' + timeStr + '</div>' : '');
                         } else if (isAmOkuri) {
                             // AM送り: 名前のみ
                             cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:8px;line-height:1;text-align:center;letter-spacing:0.1em;">' + surname + '</div>';
@@ -299,31 +299,53 @@ function WeekTable(props) {
 
             var ufs = isAmMukae ? 18 : 9;
             var uLabelFs = isAmMukae ? 13 : 8;
-            var unassignedCells = weekDates.map(function(wd) {
+            var unassignedByDay = weekDates.map(function(wd) {
                 var dayGrid = allGrids[wd.key];
                 var tGk = gridKey(sec.period, sec.dir);
                 var assignedNames = new Set();
                 if (dayGrid && dayGrid[tGk]) {
-                    dayGrid[tGk].forEach(function(car) { if (!car) return; car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); }); });
+                    dayGrid[tGk].forEach(function(car) {
+                        if (!car) return;
+                        car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); });
+                    });
                 }
-                var dayIdx = [null,0,1,2,3,4,null][new Date(wd.key + "T00:00:00").getDay()];
-                var unassigned = (people || []).filter(function(p) {
-                    if (!p || !p.name || assignedNames.has(p.name)) return false;
-                    if (p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0) {
-                        var dp = p.dayPeriods[dayIdx]; return dp && dp.indexOf(sec.period) >= 0;
+                var dateObj = new Date(wd.key + "T00:00:00");
+                var dow = dateObj.getDay();
+                var DAY_IDX = [null, 0, 1, 2, 3, 4, null];
+                var dayIdx = DAY_IDX[dow];
+                return people.filter(function(p) {
+                    if (!p || !p.name) return false;
+                    if (assignedNames.has(p.name)) return false;
+                    var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
+                    if (hasDayPeriods) {
+                        var dp = p.dayPeriods[dayIdx];
+                        if (!dp) return false;
+                        return dp.indexOf(sec.period) >= 0;
                     }
-                    return Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0 && Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
+                    var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
+                    var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
+                    return inDay && inPeriod;
+                }).sort(function(a, b) {
+                    var fa = a.furigana || a.name || "";
+                    var fb = b.furigana || b.name || "";
+                    return fa.localeCompare(fb, 'ja');
                 }).map(function(p) { return getSurname(p.name); });
-                return '<td style="background:#fafafa;font-size:' + ufs + 'px;padding:' + (isAmMukae ? "6px" : "2px") + ';border:1px solid #e0e7ef;text-align:center;">' +
-                    (unassigned.length > 0 ? '<span style="font-weight:700;color:#c05300;">' + unassigned.join("　") + '</span>' : '<span style="color:#ddd;">—</span>') + '</td>';
-            }).join("");
+            });
 
-            var emptyCells = weekDates.map(function(wd) {
-                return '<td style="background:#fafafa;font-size:' + ufs + 'px;padding:2px;border:1px solid #e0e7ef;text-align:center;"><span style="color:#ddd;">—</span></td>';
-            }).join("");
+            var makeUnassignedRow = function(rowIdx) {
+                var cells = "";
+                for (var wi = 0; wi < weekDates.length; wi++) {
+                    var arr = unassignedByDay[wi] || [];
+                    var name = arr[rowIdx] || "";
+                    cells += '<td style="background:#fafafa;font-size:' + ufs + 'px;padding:2px;border:1px solid #e0e7ef;text-align:center;">' +
+                        (name ? '<span style="font-weight:700;color:#c05300;">' + name + '</span>' : '<span style="color:#ddd;">—</span>') + '</td>';
+                }
+                return cells;
+            };
+
             var unassignedRow = isAmOkuri ? "" :
-                '<tr><td colspan="2" style="background:#4a6fa5;color:white;font-size:' + uLabelFs + 'px;font-weight:700;padding:2px;border:1px solid #374151;text-align:center;">その他</td>' + unassignedCells + '</tr>' +
-                '<tr><td colspan="2" style="background:#4a6fa5;padding:2px;border:1px solid #374151;"></td>' + emptyCells + '</tr>';
+                '<tr><td colspan="2" style="background:#4a6fa5;color:white;font-size:' + uLabelFs + 'px;font-weight:700;padding:2px;border:1px solid #374151;text-align:center;">その他</td>' + makeUnassignedRow(0) + '</tr>' +
+                '<tr><td colspan="2" style="background:#4a6fa5;padding:2px;border:1px solid #374151;"></td>' + makeUnassignedRow(1) + '</tr>';
 
             var totalCells = weekDates.map(function(wd) {
                 var dayGrid = allGrids[wd.key];
@@ -593,31 +615,66 @@ function WeekTable(props) {
                             var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
                             var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
                             return inDay && inPeriod;
+                        }).sort(function(a, b) {
+                            var fa = a.furigana || a.name || "";
+                            var fb = b.furigana || b.name || "";
+                            return fa.localeCompare(fb, 'ja');
                         }).map(function(p) { return p.name; });
+                        var name0 = unassigned[0] ? getSurname(unassigned[0]) : "";
                         return React.createElement("td", { key: wd.key, style: {
                             background: "#fafafa",
                             fontSize: 9, padding: "2px 2px",
                             border: "1px solid #e0e7ef", textAlign: "center",
                             verticalAlign: "middle", lineHeight: 1.4,
-                        } }, unassigned.length > 0
-                            ? React.createElement("div", { style: { fontWeight: 700, color: "#7c4a00", whiteSpace: "normal", wordBreak: "break-all" } },
-                                unassigned.map(function(n) { return getSurname(n); }).join("　")
-                              )
+                        } }, name0
+                            ? React.createElement("div", { style: { fontWeight: 700, color: "#7c4a00" } }, name0)
                             : React.createElement("div", { style: { color: "#ddd", fontSize: 9 } }, "—")
                         );
                     })),
-                // ── その他行2（同条件・2行目）──
+                // ── その他行2（2人目）──
                 React.createElement("tr", null,
                     React.createElement("td", { colSpan: 2, style: {
                         background: "#4a6fa5",
                         padding: "4px 2px", border: "1px solid #374151",
                     } }, ""),
                     weekDates.map(function(wd) {
+                        var dayGrid2 = allGrids[wd.key];
+                        var tGk2 = gridKey(sec.period, sec.dir);
+                        var assignedNames2 = new Set();
+                        if (dayGrid2 && dayGrid2[tGk2]) {
+                            dayGrid2[tGk2].forEach(function(car) {
+                                if (!car) return;
+                                car.forEach(function(s) { if (s && s.name) assignedNames2.add(s.name); });
+                            });
+                        }
+                        var dateObj2 = new Date(wd.key + "T00:00:00");
+                        var dayIdx2 = [null,0,1,2,3,4,null][dateObj2.getDay()];
+                        var unassigned2 = people.filter(function(p) {
+                            if (!p || !p.name) return false;
+                            if (assignedNames2.has(p.name)) return false;
+                            var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
+                            if (hasDayPeriods) {
+                                var dp = p.dayPeriods[dayIdx2];
+                                if (!dp) return false;
+                                return dp.indexOf(sec.period) >= 0;
+                            }
+                            var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx2) >= 0;
+                            var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
+                            return inDay && inPeriod;
+                        }).sort(function(a, b) {
+                            var fa = a.furigana || a.name || "";
+                            var fb = b.furigana || b.name || "";
+                            return fa.localeCompare(fb, 'ja');
+                        }).map(function(p) { return p.name; });
+                        var name1 = unassigned2[1] ? getSurname(unassigned2[1]) : "";
                         return React.createElement("td", { key: wd.key, style: {
                             background: "#fafafa", fontSize: 9, padding: "2px 2px",
                             border: "1px solid #e0e7ef", textAlign: "center",
                             verticalAlign: "middle", lineHeight: 1.4,
-                        } }, React.createElement("div", { style: { color: "#ddd", fontSize: 9 } }, "—"));
+                        } }, name1
+                            ? React.createElement("div", { style: { fontWeight: 700, color: "#7c4a00" } }, name1)
+                            : React.createElement("div", { style: { color: "#ddd", fontSize: 9 } }, "—")
+                        );
                     })),
                 // ── 4台分の合計行（最下部に1行だけ）──
                 React.createElement("tr", { style: { borderTop: "3px solid #1e3a5f" } },
