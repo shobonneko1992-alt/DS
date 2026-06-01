@@ -271,7 +271,7 @@ function WeekTable(props) {
 
                         var cellContent;
                         if (!surname) {
-                            cellContent = '<span style="color:#ddd;font-size:' + fs_time + 'px;">—</span>';
+                            cellContent = '<span class="empty-dash" style="color:#ddd;font-size:' + fs_time + 'px;">—</span>';
                         } else if (isAmMukae) {
                             // AM迎え: 名前の下に時間
                             cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:' + Math.round(nfs * 0.8) + 'px;line-height:1.2;letter-spacing:0.15em;text-align:center;">' + surname + '</div>' +
@@ -287,7 +287,7 @@ function WeekTable(props) {
                                 '</div>';
                         }
 
-                        return '<td style="background:' + bg + ';border:1px solid #e0e7ef;padding:1px;text-align:center;vertical-align:middle;">' +
+                        return '<td class="' + (!color ? 'default-cell' : '') + '" style="background:' + bg + ';border:1px solid #e0e7ef;padding:1px;text-align:center;vertical-align:middle;">' +
                             '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;">' +
                             cellContent + '</div></td>';
                     }).join("");
@@ -338,7 +338,7 @@ function WeekTable(props) {
                     var arr = unassignedByDay[wi] || [];
                     var name = arr[rowIdx] || "";
                     cells += '<td style="background:#fafafa;font-size:' + ufs + 'px;padding:2px;border:1px solid #e0e7ef;text-align:center;">' +
-                        (name ? '<span style="font-weight:700;color:#c05300;">' + name + '</span>' : '<span style="color:#ddd;">—</span>') + '</td>';
+                        (name ? '<span style="font-weight:700;color:#c05300;">' + name + '</span>' : '<span class="empty-dash" style="color:#ddd;">—</span>') + '</td>';
                 }
                 return cells;
             };
@@ -392,6 +392,10 @@ function WeekTable(props) {
             'body{background:none;padding:0;}' +
             '.page-container{box-shadow:none;padding:8mm;}' +
             '*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+            'td,th{color:black !important;}' +
+            'td.default-cell{background:white !important;}' +
+            'span,div{color:black !important;}' +
+            '.empty-dash{display:none !important;}' +
             '}' +
             '</style>' +
             '</head><body>' +
