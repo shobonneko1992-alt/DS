@@ -367,7 +367,7 @@ function WeekTable(props) {
             }).join("");
 
             var tLabelFs = isAmMukae ? 18 : 9;
-            var totalRow = isAmOkuri ? "" : '<tr style="border-top:3px solid #1e3a5f;"><td colspan="2" style="background:#1e3a5f;color:white;font-size:' + tLabelFs + 'px;font-weight:700;padding:2px;border:1px solid #374151;text-align:center;">合計</td>' + totalCells + '</tr>';
+            var totalRow = isAmOkuri ? "" : '<tr class="total-row" style="border-top:3px solid #1e3a5f;"><td colspan="2" style="background:#1e3a5f;color:white;font-size:' + tLabelFs + 'px;font-weight:700;padding:2px;border:1px solid #374151;text-align:center;">合計</td>' + totalCells + '</tr>';
 
             var secFlex = isAmOkuri ? "flex:1;" : (isPmMukae ? "flex:1.5;" : "flex:1;");
             return '<div class="sec-wrap" style="' + secFlex + 'display:flex;flex-direction:column;">' +
@@ -394,6 +394,7 @@ function WeekTable(props) {
             '*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
             'td,th{color:black !important;}' +
             'td.default-cell{background:white !important;}' +
+            'tr.total-row td{background:white !important;color:black !important;}' +
             'span,div{color:black !important;}' +
             '.empty-dash{display:none !important;}' +
             '}' +
@@ -407,12 +408,29 @@ function WeekTable(props) {
     }
     function printWeek(sections) {
         var html = buildWeekPrintHtml(sections);
-        var w = window.open("", "_blank");
-        if (!w) { alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してから再度お試しください。"); return; }
-        w.document.write(html);
-        w.document.close();
-        w.focus();
-        setTimeout(function() { w.print(); }, 400);
+
+        var oldFrame = document.getElementById("print-iframe");
+        if (oldFrame) { oldFrame.parentNode.removeChild(oldFrame); }
+
+        var iframe = document.createElement("iframe");
+        iframe.id = "print-iframe";
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "0";
+        document.body.appendChild(iframe);
+
+        var doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+
+        iframe.contentWindow.focus();
+        setTimeout(function() {
+            iframe.contentWindow.print();
+        }, 300);
     }
 
     return React.createElement("div", { style: { width: "100%", maxWidth: "100%", fontFamily: "sans-serif", boxSizing: "border-box", overflowX: "hidden" } },
