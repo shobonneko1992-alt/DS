@@ -409,28 +409,42 @@ function WeekTable(props) {
     function printWeek(sections) {
         var html = buildWeekPrintHtml(sections);
 
-        var oldFrame = document.getElementById("print-iframe");
-        if (oldFrame) { oldFrame.parentNode.removeChild(oldFrame); }
+        // まずwindow.openを試みる
+        var w = null;
+        try { w = window.open("", "_blank"); } catch(e) { w = null; }
 
-        var iframe = document.createElement("iframe");
-        iframe.id = "print-iframe";
-        iframe.style.position = "fixed";
-        iframe.style.right = "0";
-        iframe.style.bottom = "0";
-        iframe.style.width = "0";
-        iframe.style.height = "0";
-        iframe.style.border = "0";
-        document.body.appendChild(iframe);
+        if (w && w.document) {
+            // PCブラウザ: window.open方式
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
+            w.focus();
+            setTimeout(function() { w.print(); }, 400);
+        } else {
+            // PWA/インストール環境: iframe方式にフォールバック
+            var oldFrame = document.getElementById("print-iframe");
+            if (oldFrame) { oldFrame.parentNode.removeChild(oldFrame); }
 
-        var doc = iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
+            var iframe = document.createElement("iframe");
+            iframe.id = "print-iframe";
+            iframe.style.position = "fixed";
+            iframe.style.right = "0";
+            iframe.style.bottom = "0";
+            iframe.style.width = "0";
+            iframe.style.height = "0";
+            iframe.style.border = "0";
+            document.body.appendChild(iframe);
 
-        iframe.contentWindow.focus();
-        setTimeout(function() {
-            iframe.contentWindow.print();
-        }, 300);
+            var doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(html);
+            doc.close();
+
+            iframe.contentWindow.focus();
+            setTimeout(function() {
+                iframe.contentWindow.print();
+            }, 300);
+        }
     }
 
     return React.createElement("div", { style: { width: "100%", maxWidth: "100%", fontFamily: "sans-serif", boxSizing: "border-box", overflowX: "hidden" } },
