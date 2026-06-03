@@ -117,7 +117,7 @@ var WEEK_SECTIONS = [
     { label: "AM 送り", period: "AM", dir: "送り" },
     { label: "PM 迎え", period: "PM", dir: "迎え" },
 ];
-var COLOR_BG_MAP = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
+var COLOR_BG_MAP = { "": "", "gray": "#9e9e9e", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80", "orange": "#fb923c" };
 
 function WeekTable(props) {
     var allGrids = props.allGrids, setAllGrids = props.setAllGrids, selectedDate = props.selectedDate, carNames = props.carNames, drivers = props.drivers, driverList = props.driverList, absent = props.absent, people = props.people || [];
@@ -214,7 +214,7 @@ function WeekTable(props) {
     }
 
     function buildWeekPrintHtml(sections) {
-        var colorBgMap = { "": "", "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
+        var colorBgMap = { "": "", "gray": "#9e9e9e", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80", "orange": "#fb923c" };
         var mon = new Date(getMondayKey(new Date(selectedDate + "T00:00:00")) + "T00:00:00");
         var fri = new Date(mon.getTime()); fri.setDate(fri.getDate() + 4);
         var title = (mon.getMonth()+1) + "/" + mon.getDate() + "〜" + (fri.getMonth()+1) + "/" + fri.getDate();
@@ -280,7 +280,7 @@ function WeekTable(props) {
 
                         var cellContent;
                         if (!surname) {
-                            cellContent = '<span class="empty-dash" style="color:#ddd;font-size:' + fs_time + 'px;">—</span>';
+                            cellContent = '&nbsp;';
                         } else if (isAmMukae) {
                             cellContent = '<div style="display:flex;flex-direction:column;align-items:center;width:100%;">' +
                                 '<div style="font-weight:700;color:#1e3a5f;font-size:' + nfs + 'px;line-height:1.2;letter-spacing:0.1em;text-align:center;">' + surname + '</div>' +
@@ -296,13 +296,13 @@ function WeekTable(props) {
                         }
 
                         var isLastCol = wdi === weekDates.length - 1;
-                        return '<td class="' + (!color ? 'default-cell' : '') + '" style="background:' + bg + ';border:1px solid #374151;padding:' + (isPmMukae ? '2px' : (isAmOkuri ? '1px' : '1px')) + ';' + (isPmMukae ? 'height:20px;min-height:20px;' : '') + 'text-align:center;vertical-align:middle;">' +
+                        return '<td class="' + (!color ? 'default-cell' : '') + '" style="background:' + bg + ';border:1px solid #374151;padding:' + (isPmMukae ? '2px' : '1px') + ';' + (isPmMukae ? 'height:20px;min-height:20px;' : (isAmMukae ? 'height:40px;min-height:40px;' : (isAmOkuri ? 'height:16px;min-height:16px;' : ''))) + 'text-align:center;vertical-align:middle;">' +
                             '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;">' +
                             cellContent + '</div></td>';
                     }).join("");
 
                     var borderBottom = si === SEAT_COUNT - 1 ? "border-bottom:2px solid #1e3a5f;" : "";
-                    var rowHeightStyle = isPmMukae ? 'height:20px;min-height:20px;' : (isAmOkuri ? 'height:16px;min-height:16px;' : (isAmMukae ? 'height:25px;min-height:25px;' : ''));
+                    var rowHeightStyle = isPmMukae ? 'height:20px;min-height:20px;' : (isAmMukae ? 'height:40px;min-height:40px;' : (isAmOkuri ? 'height:16px;min-height:16px;' : ''));
                     return '<tr style="' + borderBottom + rowHeightStyle + '">' + drvCell + carCell + dateCells + '</tr>';
                 }).join("");
             }).join("");
@@ -479,7 +479,7 @@ function WeekTable(props) {
                 color: weekColorMode ? "white" : "#718096",
             } }, weekColorMode ? "🎨 色編集ON" : "🎨 色編集"),
             weekColorMode && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" } },
-                [["", "#e2e8f0", "なし"], ["gray", "#64748b", "灰"], ["yellow", "#facc15", "黄"], ["cyan", "#0ea5e9", "水"], ["green", "#16a34a", "緑"]].map(function(item) {
+                [["", "#e2e8f0", "なし"], ["gray", "#9e9e9e", "灰"], ["yellow", "#facc15", "黄"], ["cyan", "#0ea5e9", "水"], ["green", "#16a34a", "緑"], ["orange", "#f97316", "橙"]].map(function(item) {
                     var cv = item[0], cc = item[1], label = item[2];
                     var isSel = weekPaintColor === cv;
                     return React.createElement("div", { key: cv, onClick: function() { setWeekPaintColor(cv); }, style: {
@@ -488,7 +488,7 @@ function WeekTable(props) {
                         border: isSel ? "2.5px solid #1e3a5f" : "1.5px solid #b0bec5",
                         cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 9, fontWeight: 700,
-                        color: cv === "yellow" ? "#78350f" : cv === "gray" ? "#1e293b" : cv === "cyan" ? "#0c4a6e" : cv === "green" ? "#14532d" : "#64748b",
+                        color: cv === "yellow" ? "#78350f" : cv === "gray" ? "#424242" : cv === "cyan" ? "#0c4a6e" : cv === "green" ? "#14532d" : cv === "orange" ? "#7c2d12" : "#64748b",
                         boxShadow: isSel ? "0 0 0 2px #2d6a9f55" : "none",
                         flexShrink: 0,
                     } }, label);
@@ -1369,7 +1369,7 @@ function App() {
     }
     function buildSectionTable(ci, cname, drv, grid, gk, label) {
         var CIRC = ["①","②","③","④","⑤","⑥","⑦"];
-        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0" };
+        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0", "orange": "#fed7aa" };
         var seats = (grid[gk] || mkGrid())[ci] || [];
         var filledCount = seats.filter(function(s){ return s && s.name; }).length;
         var maxRows = Math.max(7, filledCount);
@@ -1454,7 +1454,7 @@ function App() {
         var pmGk = gridKey("PM","迎え");
         var pmSeats = (grid[pmGk] || mkGrid())[ci] || [];
         var CIRC = ["①","②","③","④","⑤","⑥","⑦"];
-        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0" };
+        var colorBgMap = { "": "#fff", "gray": "#d1d5db", "yellow": "#fef08a", "cyan": "#bae6fd", "green": "#bbf7d0", "orange": "#fed7aa" };
         var B = "border:1px solid #aaa;";
         var Bc = B + "text-align:center;";
         var BL = "border-top:1px solid #aaa;border-bottom:1px solid #aaa;border-left:1px solid #aaa;border-right:none;";
@@ -3149,7 +3149,7 @@ function App() {
                                 color: colorEditMode ? "white" : "#718096",
                             } }, colorEditMode ? "🎨 色編集ON" : "🎨 色編集"),
                             colorEditMode && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } },
-                                [["", "#e2e8f0", "なし"], ["gray", "#64748b", "灰"], ["yellow", "#facc15", "黄"], ["cyan", "#0ea5e9", "水"], ["green", "#16a34a", "緑"]].map(function(item) {
+                                [["", "#e2e8f0", "なし"], ["gray", "#9e9e9e", "灰"], ["yellow", "#facc15", "黄"], ["cyan", "#0ea5e9", "水"], ["green", "#16a34a", "緑"], ["orange", "#f97316", "橙"]].map(function(item) {
                                     var cv = item[0], cc = item[1], label = item[2];
                                     var isSelected = paintColor === cv;
                                     return React.createElement("div", { key: cv, onClick: function() { setPaintColor(cv); }, style: {
@@ -3280,8 +3280,8 @@ function App() {
                                     })))),
                             React.createElement("div", { style: { padding: "5px 7px", display: "flex", flexDirection: "column", gap: 3 } }, seats.map(function (seat, si) {
                                 var name = seat.name, seatNo = seat.seatNo, time = seat.time, seatColor = seat.color || "";
-                                var colorBg = { "": null, "gray": "#94a3b8", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80" };
-                                var colorBorder = { "": null, "gray": "#334155", "yellow": "#a16207", "cyan": "#0369a1", "green": "#166534" };
+                                var colorBg = { "": null, "gray": "#9e9e9e", "yellow": "#fde047", "cyan": "#38bdf8", "green": "#4ade80", "orange": "#fb923c" };
+                                var colorBorder = { "": null, "gray": "#757575", "yellow": "#a16207", "cyan": "#0369a1", "green": "#166534", "orange": "#c2410c" };
                                 var skey = ci + "-" + si;
                                 var sk = seatKey(ci, si);
                                 var isOpen = !moveMode && openKey === skey;
