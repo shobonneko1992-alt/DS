@@ -317,7 +317,7 @@ function WeekTable(props) {
                 if (dayGrid && dayGrid[tGk]) {
                     dayGrid[tGk].forEach(function(car) {
                         if (!car) return;
-                        car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); });
+                        car.forEach(function(s) { if (s && s.name && s.color !== "gray") assignedNames.add(s.name); });
                     });
                 }
                 var dateObj = new Date(wd.key + "T00:00:00");
@@ -653,7 +653,7 @@ function WeekTable(props) {
                         if (dayGrid && dayGrid[tGk]) {
                             dayGrid[tGk].forEach(function(car) {
                                 if (!car) return;
-                                car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); });
+                                car.forEach(function(s) { if (s && s.name && s.color !== "gray") assignedNames.add(s.name); });
                             });
                         }
                         var dateObj = new Date(wd.key + "T00:00:00");
@@ -701,7 +701,7 @@ function WeekTable(props) {
                         if (dayGrid2 && dayGrid2[tGk2]) {
                             dayGrid2[tGk2].forEach(function(car) {
                                 if (!car) return;
-                                car.forEach(function(s) { if (s && s.name) assignedNames2.add(s.name); });
+                                car.forEach(function(s) { if (s && s.name && s.color !== "gray") assignedNames2.add(s.name); });
                             });
                         }
                         var dateObj2 = new Date(wd.key + "T00:00:00");
@@ -1541,7 +1541,7 @@ function App() {
         if (!grid) return s;
         (grid[gk] || []).forEach(function (car) {
             if (!car) return;
-            car.forEach(function (seat) { if (seat && seat.name) s.add(seat.name); });
+            car.forEach(function (seat) { if (seat && seat.name && seat.color !== "gray") s.add(seat.name); });
         });
         return s;
     }, [allGrids, selectedDate, period, direction]);
@@ -1934,8 +1934,8 @@ function App() {
         var g = allGrids[toKey(viewYear, viewMonth, d)];
         if (!g) return null;
         var am = new Set(), pm = new Set();
-        if (g["AM"]) g["AM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) am.add(s.name); }); });
-        if (g["PM"]) g["PM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) pm.add(s.name); }); });
+        if (g["AM"]) g["AM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name && s.color !== "gray") am.add(s.name); }); });
+        if (g["PM"]) g["PM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name && s.color !== "gray") pm.add(s.name); }); });
         if (am.size === 0 && pm.size === 0) return null;
         return { am: am.size, pm: pm.size };
     }
@@ -2842,8 +2842,8 @@ function App() {
                     var g = allGrids[key];
                     var amSet = new Set(), pmSet = new Set();
                     if (g) {
-                        if (g["AM"]) g["AM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) amSet.add(s.name); }); });
-                        if (g["PM"]) g["PM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name) pmSet.add(s.name); }); });
+                        if (g["AM"]) g["AM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name && s.color !== "gray") amSet.add(s.name); }); });
+                        if (g["PM"]) g["PM"].forEach(function(car){ if(!car) return; car.forEach(function(s){ if(s && s.name && s.color !== "gray") pmSet.add(s.name); }); });
                     }
                     var summary = (amSet.size || pmSet.size) ? { am: amSet.size, pm: pmSet.size } : null;
                     var isToday = d.toDateString() === today.toDateString();
@@ -2877,7 +2877,7 @@ function App() {
                     ["AM", "PM"].map(function (per) {
                         var perGrid = dayGrid ? (dayGrid[per] || null) : null;
                         var countSet = new Set();
-                        if (perGrid) perGrid.forEach(function (car) { if (!car) return; car.forEach(function (s) { if (s && s.name) countSet.add(s.name); }); });
+                        if (perGrid) perGrid.forEach(function (car) { if (!car) return; car.forEach(function (s) { if (s && s.name && s.color !== "gray") countSet.add(s.name); }); });
                         return (React.createElement("div", { key: per, style: {
                                 marginBottom: 10, borderRadius: 10, padding: "10px 12px",
                                 background: per === "AM" ? "#fffef0" : "#f0f7ff",
@@ -3231,7 +3231,7 @@ function App() {
                     React.createElement("div", { ref: seatGridRef, onTouchMove: (moveMode || quickDragMode) ? handleSeatTouchMove : undefined, onTouchEnd: (moveMode || quickDragMode) ? handleSeatTouchEnd : undefined, style: { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 } }, carNames.map(function (carName, ci) {
                         var dayData = allGrids[selectedDate] || mkDay();
                         var seats = (dayData[gk] || dayData["AM"] || mkGrid())[ci] || [];
-                        var count = seats.filter(function (s) { return s && s.name; }).length;
+                        var count = seats.filter(function (s) { return s && s.name && s.color !== "gray"; }).length;
                         var memoPass = seats
                             .filter(function (s) { return s && s.name; })
                             .map(function (s) {
