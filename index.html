@@ -331,7 +331,7 @@ function WeekTable(props) {
                 if (dayGrid && dayGrid[tGk]) {
                     dayGrid[tGk].forEach(function(car) {
                         if (!car) return;
-                        car.forEach(function(s) { if (s && s.name && s.color !== "gray") assignedNames.add(s.name); });
+                        car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); });
                     });
                 }
                 var dateObj = new Date(wd.key + "T00:00:00");
@@ -653,117 +653,35 @@ function WeekTable(props) {
                             row.props.children);
                     });
                 }),
-                // ── その他行（座席未配置の対象者）──
+                // その他行
                 React.createElement("tr", { style: { borderTop: "2px solid #1e3a5f" } },
                     React.createElement("td", { colSpan: 2, style: {
-                        background: "#4a6fa5", color: "white", fontSize: 8, fontWeight: 700,
+                        background: "white", color: "#1e3a5f", fontSize: 8, fontWeight: 700,
                         padding: "4px 2px", border: "1px solid #374151",
                         textAlign: "center", whiteSpace: "nowrap",
-                    } }, "その他"),
+                    } }, "\u305d\u306e\u4ed6"),
                     weekDates.map(function(wd) {
-                        var dayGrid = allGrids[wd.key];
-                        var tGk = gridKey(sec.period, sec.dir);
-                        var assignedNames = new Set();
-                        if (dayGrid && dayGrid[tGk]) {
-                            dayGrid[tGk].forEach(function(car) {
-                                if (!car) return;
-                                car.forEach(function(s) { if (s && s.name && s.color !== "gray") assignedNames.add(s.name); });
-                            });
-                        }
                         var dateObj = new Date(wd.key + "T00:00:00");
-                        var dow = dateObj.getDay();
-                        var DAY_IDX = [null, 0, 1, 2, 3, 4, null];
-                        var dayIdx = DAY_IDX[dow];
-                        var unassigned = people.filter(function(p) {
-                            if (!p || !p.name) return false;
-                            if (assignedNames.has(p.name)) return false;
-                            if (getUnassignedColor(wd.key, sec.period, sec.dir, p.name) === "gray") return false;
+                        var dayIdx = [null,0,1,2,3,4,null][dateObj.getDay()];
+                        var noTransportPeople = people.filter(function(p) {
+                            if (!p || !p.name || !p.noTransport) return false;
                             var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
                             if (hasDayPeriods) {
                                 var dp = p.dayPeriods[dayIdx];
-                                if (!dp) return false;
-                                return dp.indexOf(sec.period) >= 0;
+                                return dp && dp.indexOf(sec.period) >= 0;
                             }
                             var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
                             var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
                             return inDay && inPeriod;
-                        }).sort(function(a, b) {
-                            var fa = a.furigana || a.name || "";
-                            var fb = b.furigana || b.name || "";
-                            return fa.localeCompare(fb, 'ja');
-                        }).map(function(p) { return p.name; });
-                        var name0 = unassigned[0] ? getSurname(unassigned[0]) : "";
-                        var fullName0 = unassigned[0] || "";
-                        var uColor0 = fullName0 ? getUnassignedColor(wd.key, sec.period, sec.dir, fullName0) : "";
-                        var uBg0 = uColor0 ? ({"gray":"#9e9e9e","yellow":"#fde047","cyan":"#38bdf8","green":"#4ade80","orange":"#fb923c"}[uColor0] || "#fafafa") : "#fafafa";
-                        var _wdKey0 = wd.key, _per0 = sec.period, _dir0 = sec.dir, _fn0 = fullName0;
-                        return React.createElement("td", { key: wd.key,
-                            onClick: function() { if (weekColorMode && _fn0) { setUnassignedColor(_wdKey0, _per0, _dir0, _fn0, weekPaintColor); } },
-                            style: {
-                            background: uBg0,
-                            fontSize: 9, padding: "2px 2px",
-                            border: "1px solid #e0e7ef", textAlign: "center",
-                            verticalAlign: "middle", lineHeight: 1.4,
-                            cursor: weekColorMode && name0 ? "pointer" : "default",
-                        } }, name0
-                            ? React.createElement("div", { style: { fontWeight: 700, color: uColor0 === "gray" ? "#616161" : "#7c4a00" } }, name0)
-                            : React.createElement("div", { style: { color: "#ddd", fontSize: 9 } }, "—")
-                        );
+                        }).map(function(p) { return getSurname(p.name); });
+                        return React.createElement("td", { key: wd.key, style: {
+                            background: "white", fontSize: 9, padding: "2px",
+                            border: "1px solid #374151", textAlign: "center", verticalAlign: "middle",
+                        } }, noTransportPeople.length > 0
+                            ? noTransportPeople.map(function(n, i) { return React.createElement("div", { key: i, style: { fontWeight: 700, color: "#1e3a5f" } }, n); })
+                            : React.createElement("div", { style: { color: "#ddd" } }, "—"));
                     })),
-                // ── その他行2（2人目）──
-                React.createElement("tr", null,
-                    React.createElement("td", { colSpan: 2, style: {
-                        background: "#4a6fa5",
-                        padding: "4px 2px", border: "1px solid #374151",
-                    } }, ""),
-                    weekDates.map(function(wd) {
-                        var dayGrid2 = allGrids[wd.key];
-                        var tGk2 = gridKey(sec.period, sec.dir);
-                        var assignedNames2 = new Set();
-                        if (dayGrid2 && dayGrid2[tGk2]) {
-                            dayGrid2[tGk2].forEach(function(car) {
-                                if (!car) return;
-                                car.forEach(function(s) { if (s && s.name && s.color !== "gray") assignedNames2.add(s.name); });
-                            });
-                        }
-                        var dateObj2 = new Date(wd.key + "T00:00:00");
-                        var dayIdx2 = [null,0,1,2,3,4,null][dateObj2.getDay()];
-                        var unassigned2 = people.filter(function(p) {
-                            if (!p || !p.name) return false;
-                            if (assignedNames2.has(p.name)) return false;
-                            if (getUnassignedColor(wd.key, sec.period, sec.dir, p.name) === "gray") return false;
-                            var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
-                            if (hasDayPeriods) {
-                                var dp = p.dayPeriods[dayIdx2];
-                                if (!dp) return false;
-                                return dp.indexOf(sec.period) >= 0;
-                            }
-                            var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx2) >= 0;
-                            var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
-                            return inDay && inPeriod;
-                        }).sort(function(a, b) {
-                            var fa = a.furigana || a.name || "";
-                            var fb = b.furigana || b.name || "";
-                            return fa.localeCompare(fb, 'ja');
-                        }).map(function(p) { return p.name; });
-                        var name1 = unassigned2[1] ? getSurname(unassigned2[1]) : "";
-                        var fullName1 = unassigned2[1] || "";
-                        var uColor1 = fullName1 ? getUnassignedColor(wd.key, sec.period, sec.dir, fullName1) : "";
-                        var uBg1 = uColor1 ? ({"gray":"#9e9e9e","yellow":"#fde047","cyan":"#38bdf8","green":"#4ade80","orange":"#fb923c"}[uColor1] || "#fafafa") : "#fafafa";
-                        var _wdKey1 = wd.key, _per1 = sec.period, _dir1 = sec.dir, _fn1 = fullName1;
-                        return React.createElement("td", { key: wd.key,
-                            onClick: function() { if (weekColorMode && _fn1) { setUnassignedColor(_wdKey1, _per1, _dir1, _fn1, weekPaintColor); } },
-                            style: {
-                            background: uBg1, fontSize: 9, padding: "2px 2px",
-                            border: "1px solid #e0e7ef", textAlign: "center",
-                            verticalAlign: "middle", lineHeight: 1.4,
-                            cursor: weekColorMode && name1 ? "pointer" : "default",
-                        } }, name1
-                            ? React.createElement("div", { style: { fontWeight: 700, color: uColor1 === "gray" ? "#616161" : "#7c4a00" } }, name1)
-                            : React.createElement("div", { style: { color: "#ddd", fontSize: 9 } }, "—")
-                        );
-                    })),
-                // ── 4台分の合計行（最下部に1行だけ）──
+                // ―― 4台分の合計行（最下部に1行だけ）――
                 React.createElement("tr", { style: { borderTop: "3px solid #1e3a5f" } },
                     React.createElement("td", { colSpan: 2, style: {
                         background: "#1e3a5f", color: "white", fontSize: 10, fontWeight: 700,
@@ -780,34 +698,19 @@ function WeekTable(props) {
                                 car.forEach(function(s) { if (s && s.name && s.color !== "gray") total++; });
                             });
                         }
-                        // その他（未配置）人数も加算
-                        var assignedNames = new Set();
-                        if (dayGrid && dayGrid[tGk]) {
-                            dayGrid[tGk].forEach(function(car) {
-                                if (!car) return;
-                                car.forEach(function(s) { if (s && s.name && s.color !== "gray") assignedNames.add(s.name); });
-                            });
-                        }
                         var dateObj = new Date(wd.key + "T00:00:00");
-                        var dow = dateObj.getDay();
-                        var DAY_IDX = [null, 0, 1, 2, 3, 4, null];
-                        var dayIdx = DAY_IDX[dow];
-                        var unassignedCount = people.filter(function(p) {
-                            if (!p || !p.name) return false;
-                            if (assignedNames.has(p.name)) return false;
+                        var dayIdx = [null,0,1,2,3,4,null][dateObj.getDay()];
+                        total += people.filter(function(p) {
+                            if (!p || !p.name || !p.noTransport) return false;
                             var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
                             if (hasDayPeriods) {
                                 var dp = p.dayPeriods[dayIdx];
-                                if (!dp) return false;
-                                return dp.indexOf(sec.period) >= 0;
+                                return dp && dp.indexOf(sec.period) >= 0;
                             }
                             var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
                             var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
                             return inDay && inPeriod;
-                        }).filter(function(p) {
-                            return getUnassignedColor(wd.key, sec.period, sec.dir, p.name) !== "gray";
                         }).length;
-                        total += unassignedCount;
                         return React.createElement("td", { key: wd.key, style: {
                             background: "#1e3a5f", color: "white",
                             fontSize: 11, fontWeight: 800, padding: "4px 2px",
@@ -1081,9 +984,14 @@ function PersonDetailPage(props) {
             React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
                 React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 } },
                     React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u5229\u7528\u6642\u9593\u5e2f"),
-                    React.createElement("label", { style:{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#4a5568", cursor:"pointer", userSelect:"none" } },
-                        React.createElement("input", { type:"checkbox", checked:!!person.dayPeriodsEnabled, onChange:function(){ onToggleDayPeriodEnabled(person.name); if(onSave) onSave(); }, style:{ width:15, height:15, cursor:"pointer" } }),
-                        "\u66dc\u65e5\u5225\u8a2d\u5b9a")),
+                    React.createElement("div", { style:{ display:"flex", alignItems:"center", gap:12 } },
+                        React.createElement("label", { style:{ display:"flex", alignItems:"center", gap:5, fontSize:11, cursor:"pointer", userSelect:"none",
+                            color: person.noTransport ? "#e53e3e" : "#718096", fontWeight: person.noTransport ? 700 : 400 } },
+                            React.createElement("input", { type:"checkbox", checked:!!person.noTransport, onChange:function(){ props.onToggleTransport(person.name); if(onSave) onSave(); }, style:{ width:15, height:15, cursor:"pointer" } }),
+                            "\u305d\u306e\u4ed6"),
+                        React.createElement("label", { style:{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#4a5568", cursor:"pointer", userSelect:"none" } },
+                            React.createElement("input", { type:"checkbox", checked:!!person.dayPeriodsEnabled, onChange:function(){ onToggleDayPeriodEnabled(person.name); if(onSave) onSave(); }, style:{ width:15, height:15, cursor:"pointer" } }),
+                            "\u66dc\u65e5\u5225\u8a2d\u5b9a"))),
                 !person.dayPeriodsEnabled
                     ? React.createElement("div", { style:{ display:"flex", gap:10 } }, ["AM","PM"].map(function(pp2){
                         var active = periods.indexOf(pp2)>=0;
@@ -1113,7 +1021,6 @@ function PersonDetailPage(props) {
             React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
                 React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\uD83D\uDCDD \u30e1\u30e2"),
                 React.createElement("textarea", { value:person.memo||"", onChange:function(e){onSetMemo(person.name,e.target.value);}, onBlur:function(){ if(onSave) onSave(); }, placeholder:"\u30e1\u30e2\u3092\u5165\u529b\u2026", style:{ width:"100%", border:"1.5px solid #e0e7ef", borderRadius:8, padding:"10px 12px", fontSize:13, outline:"none", resize:"none", minHeight:110, fontFamily:"inherit", boxSizing:"border-box", lineHeight:1.6 } })),
-            React.createElement("button", { onClick:handleClose, style:{ padding:"15px", borderRadius:12, border:"none", background:"#1e3a5f", color:"white", fontSize:15, fontWeight:800, cursor:"pointer", boxShadow:"0 4px 12px rgba(30,58,95,.3)" } }, "\u2713 \u4fdd\u5b58\u3057\u3066\u623b\u308b"),
             React.createElement("button", { onClick:function(){ setConfirmDelete(true); }, style:{ padding:"13px", borderRadius:12, border:"1.5px solid #fca5a5", background:"white", color:"#dc2626", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 } }, "\uD83D\uDDD1\uFE0F \u3053\u306e\u5229\u7528\u8005\u3092\u524a\u9664")));
 }
 
@@ -1723,6 +1630,14 @@ function App() {
                 var pos = periods.indexOf(period);
                 if (pos >= 0) periods.splice(pos, 1); else periods.push(period);
                 return Object.assign({}, p, { periods: periods });
+            });
+        });
+    }
+    function toggleTransport(name) {
+        setPeople(function(prev) {
+            return prev.map(function(p) {
+                if (p.name !== name) return p;
+                return Object.assign({}, p, { noTransport: !p.noTransport });
             });
         });
     }
@@ -2548,6 +2463,7 @@ function App() {
             onToggleDay: toggleScheduleDay,
             onTogglePeriod: toggleSchedulePeriod,
             onToggleDayPeriodEnabled: toggleDayPeriodEnabled,
+            onToggleTransport: toggleTransport,
             onSetDayPeriod: setPersonDayPeriod,
             onRemove: removePerson,
             onSave: handleSave,
@@ -3353,7 +3269,7 @@ function App() {
                                                 setOpenKey(isOpen ? null : skey);
                                                 setSearch("");
                                             }, style: { display: "flex", alignItems: "center", flex: 1, cursor: (!moveMode && colorEditMode) ? "crosshair" : (moveMode ? "grab" : "pointer"), userSelect: "none", minWidth: 0, WebkitUserSelect: "none" } },
-                                            React.createElement("span", { style: { flex: 1, fontSize: 11, fontWeight: name ? 600 : 400, color: name ? (isDup ? "#e65100" : "#1e3a5f") : "#a0aec0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: (name && absent.has(name)) ? "line-through" : "none" } }, name || "未配置")),
+                                            React.createElement("span", { style: { flex: 1, fontSize: 11, fontWeight: name ? 600 : 400, color: name ? (isDup ? "#e65100" : "#1e3a5f") : "#a0aec0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: (name && absent.has(name)) ? "line-through" : "none" } }, name || "")),
                                         name && !moveMode && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flexShrink: 0 } },
                                             React.createElement("div", { onClick: handleTimeClick, style: { position: "relative", flexShrink: 0 } },
                                                 React.createElement("select", { value: time, onChange: function (e) { handleTimeChange(ci, si, e); }, onClick: handleTimeClick, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 11 } },
