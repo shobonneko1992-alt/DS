@@ -677,6 +677,7 @@ function WeekTable(props) {
                         var unassigned = people.filter(function(p) {
                             if (!p || !p.name) return false;
                             if (assignedNames.has(p.name)) return false;
+                            if (getUnassignedColor(wd.key, sec.period, sec.dir, p.name) === "gray") return false;
                             var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
                             if (hasDayPeriods) {
                                 var dp = p.dayPeriods[dayIdx];
@@ -730,6 +731,7 @@ function WeekTable(props) {
                         var unassigned2 = people.filter(function(p) {
                             if (!p || !p.name) return false;
                             if (assignedNames2.has(p.name)) return false;
+                            if (getUnassignedColor(wd.key, sec.period, sec.dir, p.name) === "gray") return false;
                             var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
                             if (hasDayPeriods) {
                                 var dp = p.dayPeriods[dayIdx2];
