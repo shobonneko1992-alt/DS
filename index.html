@@ -325,44 +325,33 @@ function WeekTable(props) {
             var ufs = isAmMukae ? 16 : (isPmMukae ? 12 : 10);
             var uLabelFs = isAmMukae ? 13 : (isPmMukae ? 11 : 9);
             var unassignedByDay = weekDates.map(function(wd) {
-                var dayGrid = allGrids[wd.key];
-                var tGk = gridKey(sec.period, sec.dir);
-                var assignedNames = new Set();
-                if (dayGrid && dayGrid[tGk]) {
-                    dayGrid[tGk].forEach(function(car) {
-                        if (!car) return;
-                        car.forEach(function(s) { if (s && s.name) assignedNames.add(s.name); });
-                    });
-                }
                 var dateObj = new Date(wd.key + "T00:00:00");
                 var dow = dateObj.getDay();
                 var DAY_IDX = [null, 0, 1, 2, 3, 4, null];
                 var dayIdx = DAY_IDX[dow];
                 return people.filter(function(p) {
-                    if (!p || !p.name) return false;
-                    if (assignedNames.has(p.name)) return false;
+                    if (!p || !p.name || !p.noTransport) return false;
                     var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
                     if (hasDayPeriods) {
                         var dp = p.dayPeriods[dayIdx];
-                        if (!dp) return false;
-                        return dp.indexOf(sec.period) >= 0;
+                        return dp && dp.indexOf(sec.period) >= 0;
                     }
                     var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
                     var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
                     return inDay && inPeriod;
-                }).sort(function(a, b) {
-                    return (a.furigana || a.name || "").localeCompare(b.furigana || b.name || "", 'ja');
-                }).map(function(p) { return getSurname(p.name); });
+                });
             });
 
             var makeUnassignedRow = function(rowIdx) {
                 var cells = "";
                 for (var wi = 0; wi < weekDates.length; wi++) {
                     var arr = unassignedByDay[wi] || [];
-                    var n = arr[rowIdx] || "";
-                    var isLastCol = wi === weekDates.length - 1;
-                    cells += '<td style="background:#fafafa;font-size:' + ufs + 'px;padding:2px;border:1px solid #374151;text-align:center;vertical-align:middle;min-height:1.5em;">' +
-                        (n ? '<span style="font-weight:700;color:#c05300;">' + n + '</span>' : '&nbsp;') + '</td>';
+                    var p = arr[rowIdx] || null;
+                    var n = p ? getSurname(p.name) : "";
+                    var uColor = p ? (getUnassignedColor(weekDates[wi].key, sec.period, sec.dir, p.name) || "") : "";
+                    var uBg = uColor ? (colorBgMap[uColor] || "white") : "white";
+                    cells += '<td style="background:' + uBg + ';font-size:' + ufs + 'px;padding:2px;border:1px solid #374151;text-align:center;vertical-align:middle;min-height:1.5em;">' +
+                        (n ? '<span style="font-weight:700;color:' + (uColor === "gray" ? "#616161" : "#c05300") + ';">' + n + '</span>' : '&nbsp;') + '</td>';
                 }
                 return cells;
             };
@@ -374,13 +363,14 @@ function WeekTable(props) {
             var totalCells = weekDates.map(function(wd) {
                 var dayGrid = allGrids[wd.key];
                 var tGk = gridKey(sec.period, sec.dir);
-                var total = 0; var assignedNames = new Set();
+                var total = 0;
                 if (dayGrid && dayGrid[tGk]) {
-                    dayGrid[tGk].forEach(function(car) { if (!car) return; car.forEach(function(s) { if (s && s.name && s.color !== "gray") { total++; assignedNames.add(s.name); } }); });
+                    dayGrid[tGk].forEach(function(car) { if (!car) return; car.forEach(function(s) { if (s && s.name && s.color !== "gray") total++; }); });
                 }
                 var dayIdx = [null,0,1,2,3,4,null][new Date(wd.key + "T00:00:00").getDay()];
                 total += (people || []).filter(function(p) {
-                    if (!p || !p.name || assignedNames.has(p.name)) return false;
+                    if (!p || !p.name || !p.noTransport) return false;
+                    if (getUnassignedColor(wd.key, sec.period, sec.dir, p.name) === "gray") return false;
                     if (p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0) {
                         var dp = p.dayPeriods[dayIdx]; return dp && dp.indexOf(sec.period) >= 0;
                     }
@@ -673,13 +663,31 @@ function WeekTable(props) {
                             var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
                             var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
                             return inDay && inPeriod;
-                        }).map(function(p) { return getSurname(p.name); });
+                        });
+                        var _wdKey = wd.key, _per = sec.period, _dir = sec.dir;
                         return React.createElement("td", { key: wd.key, style: {
                             background: "white", fontSize: 9, padding: "2px",
                             border: "1px solid #374151", textAlign: "center", verticalAlign: "middle",
                         } }, noTransportPeople.length > 0
-                            ? noTransportPeople.map(function(n, i) { return React.createElement("div", { key: i, style: { fontWeight: 700, color: "#1e3a5f" } }, n); })
-                            : React.createElement("div", { style: { color: "#ddd" } }, "—"));
+                            ? noTransportPeople.map(function(p) {
+                                var uColor = getUnassignedColor(_wdKey, _per, _dir, p.name);
+                                var uBg = uColor ? ({"gray":"#9e9e9e","yellow":"#fde047","cyan":"#38bdf8","green":"#4ade80","orange":"#fb923c"}[uColor] || "white") : "white";
+                                var _fn = p.name;
+                                return React.createElement("div", {
+                                    key: p.name,
+                                    onClick: function() { if (weekColorMode) { setUnassignedColor(_wdKey, _per, _dir, _fn, weekPaintColor); } },
+                                    style: {
+                                        fontWeight: 700,
+                                        color: uColor === "gray" ? "#616161" : "#1e3a5f",
+                                        background: uBg,
+                                        borderRadius: 3,
+                                        padding: "1px 2px",
+                                        cursor: weekColorMode ? "pointer" : "default",
+                                        marginBottom: 1,
+                                    }
+                                }, getSurname(p.name));
+                            })
+                            : React.createElement("div", { style: { color: "#ddd" } }, "\u2014"));
                     })),
                 // ―― 4台分の合計行（最下部に1行だけ）――
                 React.createElement("tr", { style: { borderTop: "3px solid #1e3a5f" } },
@@ -698,16 +706,17 @@ function WeekTable(props) {
                                 car.forEach(function(s) { if (s && s.name && s.color !== "gray") total++; });
                             });
                         }
-                        var dateObj = new Date(wd.key + "T00:00:00");
-                        var dayIdx = [null,0,1,2,3,4,null][dateObj.getDay()];
+                        var dateObj2 = new Date(wd.key + "T00:00:00");
+                        var dayIdx2 = [null,0,1,2,3,4,null][dateObj2.getDay()];
                         total += people.filter(function(p) {
                             if (!p || !p.name || !p.noTransport) return false;
+                            if (getUnassignedColor(wd.key, sec.period, sec.dir, p.name) === "gray") return false;
                             var hasDayPeriods = p.dayPeriodsEnabled && p.dayPeriods && Object.keys(p.dayPeriods).length > 0;
                             if (hasDayPeriods) {
-                                var dp = p.dayPeriods[dayIdx];
+                                var dp = p.dayPeriods[dayIdx2];
                                 return dp && dp.indexOf(sec.period) >= 0;
                             }
-                            var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx) >= 0;
+                            var inDay = Array.isArray(p.days) && p.days.indexOf(dayIdx2) >= 0;
                             var inPeriod = Array.isArray(p.periods) && p.periods.indexOf(sec.period) >= 0;
                             return inDay && inPeriod;
                         }).length;
