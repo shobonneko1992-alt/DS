@@ -223,8 +223,18 @@ function WeekTable(props) {
         if (rawName == null || rawName === "") return "";
         var trimmed = rawName.trim();
         if (!trimmed) return "";
-        var parts = trimmed.split(/[\s\u3000]+/);
-        return (parts[0] && parts[0].length > 0) ? parts[0] : trimmed;
+        var person = (people || []).find(function(p) { return p && p.name === rawName; });
+        if (person && person.initialOnly) {
+            var parts = trimmed.split(/[\s\u3000]+/);
+            if (parts.length >= 2 && parts[1]) {
+                return parts[0] + "\uff08" + parts[1].slice(0, 1) + "\uff09";
+            }
+            return parts[0];
+        }
+        if (trimmed.length >= 3) {
+            return trimmed.slice(0, 3);
+        }
+        return trimmed;
     }
 
     function buildWeekPrintHtml(sections) {
@@ -975,7 +985,12 @@ function PersonDetailPage(props) {
             })),
         React.createElement("div", { style:{ padding:14, display:"flex", flexDirection:"column", gap:10 } },
             React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
-                React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u6c0f\u540d"),
+                React.createElement("div", { style:{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 } },
+                    React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u6c0f\u540d"),
+                    React.createElement("label", { style:{ display:"flex", alignItems:"center", gap:5, fontSize:11, cursor:"pointer", userSelect:"none",
+                        color: person.initialOnly ? "#1e3a5f" : "#718096", fontWeight: person.initialOnly ? 700 : 400 } },
+                        React.createElement("input", { type:"checkbox", checked:!!person.initialOnly, onChange:function(){ props.onToggleInitialOnly(person.name); if(onSave) onSave(); }, style:{ width:15, height:15, cursor:"pointer" } }),
+                        "\u982d\u6587\u5b57\u8868\u793a")),
                 React.createElement("input", { value:editName, onChange:function(e){setEditName(e.target.value);}, style:{ width:"100%", border:"1.5px solid #c0ccda", borderRadius:8, padding:"10px 12px", fontSize:17, fontWeight:700, color:"#1e3a5f", outline:"none", fontFamily:"inherit", boxSizing:"border-box" } })),
             React.createElement("div", { style:{ background:"white", borderRadius:12, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,.06)" } },
                 React.createElement("div", { style:{ fontSize:11, color:"#718096", fontWeight:700, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" } }, "\u30d5\u30ea\u30ac\u30ca"),
@@ -1639,6 +1654,14 @@ function App() {
                 var pos = periods.indexOf(period);
                 if (pos >= 0) periods.splice(pos, 1); else periods.push(period);
                 return Object.assign({}, p, { periods: periods });
+            });
+        });
+    }
+    function toggleInitialOnly(name) {
+        setPeople(function(prev) {
+            return prev.map(function(p) {
+                if (p.name !== name) return p;
+                return Object.assign({}, p, { initialOnly: !p.initialOnly });
             });
         });
     }
@@ -2473,6 +2496,7 @@ function App() {
             onTogglePeriod: toggleSchedulePeriod,
             onToggleDayPeriodEnabled: toggleDayPeriodEnabled,
             onToggleTransport: toggleTransport,
+            onToggleInitialOnly: toggleInitialOnly,
             onSetDayPeriod: setPersonDayPeriod,
             onRemove: removePerson,
             onSave: handleSave,
