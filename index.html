@@ -314,9 +314,9 @@ function WeekTable(props) {
                         } else if (isAmOkuri) {
                             cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:11px;line-height:1;text-align:center;letter-spacing:0.05em;">' + surname + '</div>';
                         } else {
-                            cellContent = '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:0 2px;box-sizing:border-box;">' +
-                                '<span style="font-weight:700;color:#1e3a5f;font-size:12px;white-space:nowrap;padding-left:2em;">' + surname + '</span>' +
-                                (timeStr ? '<span style="color:#1a1a1a;font-size:10px;font-weight:700;white-space:nowrap;text-align:right;padding-right:1em;">' + timeStr + '</span>' : '') +
+                            cellContent = '<div style="display:flex;align-items:center;width:100%;padding:0 2px;box-sizing:border-box;">' +
+                                '<span style="display:inline-block;width:6em;font-weight:700;color:#1e3a5f;font-size:12px;white-space:nowrap;overflow:hidden;flex-shrink:0;">' + surname + '</span>' +
+                                (timeStr ? '<span style="color:#1a1a1a;font-size:12px;font-weight:700;white-space:nowrap;">' + timeStr + '</span>' : '') +
                                 '</div>';
                         }
 
@@ -2875,14 +2875,15 @@ function App() {
                                 var seats = perGrid[ci] || [];
                                 var filled = seats.filter(function (s) { return s && s.name; });
                                 return (React.createElement("div", { key: ci, style: { background: "white", borderRadius: 8, padding: "6px 8px", border: "1px solid #e0e7ef" } },
-                                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#1e3a5f", marginBottom: 4 } },
-                                        "\uD83D\uDE99 ",
-                                        cname),
+                                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#1e3a5f", marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" } },
+                                        React.createElement("span", null, "\uD83D\uDE99 ", cname),
+                                        React.createElement("span", { style: { fontWeight: 600, color: "#4a5568", fontSize: 11, marginRight: "3em" } },
+                                            (allGrids[dayKey] && allGrids[dayKey].drivers && allGrids[dayKey].drivers[ci]) || "")),
                                     filled.length > 0
                                         ? filled.map(function (s, si) {
-                                            return (React.createElement("div", { key: si, style: { fontSize: 11, color: "#374151", display: "flex", gap: 4, alignItems: "center", marginBottom: 2 } },
-                                                React.createElement("span", null, s.name),
-                                                s.time && React.createElement("span", { style: { color: "#2d6a9f", fontWeight: 700 } }, s.time),
+                                            return (React.createElement("div", { key: si, style: { fontSize: 11, color: "#374151", display: "flex", alignItems: "center", marginBottom: 2 } },
+                                                React.createElement("span", { style: { display: "inline-block", width: "9em", fontWeight: 600, overflow: "hidden", whiteSpace: "nowrap", flexShrink: 0 } }, s.name),
+                                                s.time && React.createElement("span", { style: { color: "#2d6a9f", fontWeight: 700, whiteSpace: "nowrap" } }, s.time),
                                                 s.seatNo && React.createElement("span", { style: { color: "#718096", fontSize: 10 } }, s.seatNo)));
                                         })
                                         : React.createElement("div", { style: { fontSize: 11, color: "#a0aec0" } }, "\u672A\u914D\u8ECA")));
