@@ -315,7 +315,7 @@ function WeekTable(props) {
                             cellContent = '<div style="font-weight:700;color:#1e3a5f;font-size:11px;line-height:1;text-align:center;letter-spacing:0.05em;">' + surname + '</div>';
                         } else {
                             cellContent = '<div style="display:flex;align-items:center;width:100%;padding:0 2px;box-sizing:border-box;">' +
-                                '<span style="display:inline-block;width:6em;font-weight:700;color:#1e3a5f;font-size:12px;white-space:nowrap;overflow:hidden;flex-shrink:0;">' + surname + '</span>' +
+                                '<span style="display:inline-block;width:72px;font-weight:700;color:#1e3a5f;font-size:12px;white-space:nowrap;overflow:hidden;flex-shrink:0;">' + surname + '</span>' +
                                 (timeStr ? '<span style="color:#1a1a1a;font-size:12px;font-weight:700;white-space:nowrap;">' + timeStr + '</span>' : '') +
                                 '</div>';
                         }
@@ -403,7 +403,7 @@ function WeekTable(props) {
         return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
             '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">' +
             '<style>' +
-            'html,body{margin:0;padding:0;box-sizing:border-box;}' +
+            'html,body{margin:0;padding:0;box-sizing:border-box;-webkit-text-size-adjust:100%;text-size-adjust:100%;}' +
             'body{font-family:"Noto Sans JP","Meiryo","MS PGothic",sans-serif;font-size:9px;background:#f0f0f0;display:flex;justify-content:center;padding:20px;box-sizing:border-box;}' +
             'h2{margin:0 0 2mm;font-size:11px;font-weight:bold;padding-left:1em;}' +
             'table{width:100%;border-collapse:collapse;table-layout:fixed;}' +
@@ -2882,7 +2882,7 @@ function App() {
                                     filled.length > 0
                                         ? filled.map(function (s, si) {
                                             return (React.createElement("div", { key: si, style: { fontSize: 11, color: "#374151", display: "flex", alignItems: "center", marginBottom: 2 } },
-                                                React.createElement("span", { style: { display: "inline-block", width: "9em", fontWeight: 600, overflow: "hidden", whiteSpace: "nowrap", flexShrink: 0 } }, s.name),
+                                                React.createElement("span", { style: { display: "inline-block", width: "99px", fontWeight: 600, overflow: "hidden", whiteSpace: "nowrap", flexShrink: 0 } }, s.name),
                                                 s.time && React.createElement("span", { style: { color: "#2d6a9f", fontWeight: 700, whiteSpace: "nowrap" } }, s.time),
                                                 s.seatNo && React.createElement("span", { style: { color: "#718096", fontSize: 10 } }, s.seatNo)));
                                         })
