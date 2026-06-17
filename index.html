@@ -437,51 +437,37 @@ function WeekTable(props) {
             '</body></html>';
     }
     function printWeek(sections) {
-        var html = buildWeekPrintHtml(sections);
-
-        // まずwindow.openを試みる
-        var w = null;
-        try { w = window.open("", "_blank"); } catch(e) { w = null; }
-
-        if (w && w.document) {
-            // PCブラウザ: window.open方式、onloadで確実に描画完了後に印刷
-            w.document.open();
-            w.document.write(html);
-            w.document.close();
-            w.focus();
-            w.onload = function() {
-                setTimeout(function() { w.print(); }, 500);
-            };
-            // onloadが発火しない場合のフォールバック
-            setTimeout(function() {
-                if (w && !w.closed) { w.print(); }
-            }, 1500);
-        } else {
-            // PWA/インストール環境: iframe方式にフォールバック
-            var oldFrame = document.getElementById("print-iframe");
-            if (oldFrame) { oldFrame.parentNode.removeChild(oldFrame); }
-
-            var iframe = document.createElement("iframe");
-            iframe.id = "print-iframe";
-            iframe.style.position = "fixed";
-            iframe.style.right = "0";
-            iframe.style.bottom = "0";
-            iframe.style.width = "0";
-            iframe.style.height = "0";
-            iframe.style.border = "0";
-            document.body.appendChild(iframe);
-
-            var doc = iframe.contentWindow.document;
-            doc.open();
-            doc.write(html);
-            doc.close();
-
+        var htmlString = buildWeekPrintHtml(sections);
+        
+        // 印刷用の隠しiframeを作成
+        var iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "none";
+        iframe.style.zIndex = "-1000";
+        document.body.appendChild(iframe);
+        
+        var doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(htmlString);
+        doc.close();
+        
+        // iPhone SafariのURL対策としてタイトルを半角スペースに設定
+        iframe.contentWindow.document.title = " ";
+        
+        setTimeout(function() {
             iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            // 印刷が終わったらiframeを削除
             setTimeout(function() {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
+                if (iframe && iframe.parentNode) {
+                    iframe.parentNode.removeChild(iframe);
+                }
             }, 1000);
-        }
+        }, 600);
     }
 
     return React.createElement("div", { style: { width: "100%", maxWidth: "100%", fontFamily: "sans-serif", boxSizing: "border-box", overflowX: "hidden" } },
@@ -1470,27 +1456,55 @@ function App() {
     function openPrintWindow(title, bodyHtml, colorMode) {
         var isColor = colorMode !== undefined ? colorMode : printColorMode;
         var dateStr = buildNipper(selectedDate);
-        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
+        
+        var htmlString = '<!DOCTYPE html><html><head><meta charset="utf-8"><title> </title>' +
             '<style>' +
-            'body{font-family:"Meiryo","MS PGothic","Hiragino Kaku Gothic ProN",sans-serif;margin:0;padding:2mm;font-size:11px;box-sizing:border-box;}' +
+            'body{font-family:"Meiryo","MS PGothic","Hiragino Kaku Gothic ProN",sans-serif;margin:0;padding:8mm;font-size:11px;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
             'h1{font-size:14px;font-weight:bold;margin:0 0 3px;letter-spacing:2px;}' +
             'p{margin:5px 0 2px;font-size:11px;font-weight:bold;}' +
             'table{border-collapse:collapse;width:100%;table-layout:fixed;}' +
             'td{font-size:10px;padding:1px 3px;overflow:hidden;}' +
             (isColor ? '' : '*{background:#fff!important;color:#000!important;border-color:#000!important;}') +
-            '@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-            '@page{size:A4 portrait;margin:4mm;}' +
-            'body{padding:2mm;}' +
+            '@media print{' +
+            '  html, body { margin: 0 !important; padding: 6mm !important; background: white !important; }' +
             '}' +
+            '@page{size:A4 portrait;margin:0 !important;}' +
             '</style></head><body>' +
             '<h1>送迎日報　　' + dateStr + '</h1>' +
             bodyHtml +
             '</body></html>';
-        var w = window.open("", "_blank");
-        if (!w) { alert("ポップアップがブロックされています。"); return; }
-        w.document.write(html); w.document.close(); w.focus();
-        setTimeout(function() { w.print(); }, 400);
+
+        // 印刷用の隠しiframeを作成
+        var iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "none";
+        iframe.style.zIndex = "-1000";
+        document.body.appendChild(iframe);
+        
+        var doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(htmlString);
+        doc.close();
+        
+        // URL対策のタイトル空欄化
+        iframe.contentWindow.document.title = " ";
+        
+        setTimeout(function() {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            setTimeout(function() {
+                if (iframe && iframe.parentNode) {
+                    iframe.parentNode.removeChild(iframe);
+                }
+            }, 1000);
+        }, 600);
     }
+
+
     function handlePrintAll(colorMode) {
         if (!selectedDate || !grid) return;
         var body = carNames.map(function(cname, ci) {
