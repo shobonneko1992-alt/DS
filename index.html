@@ -155,6 +155,172 @@ function WeekTable(props) {
         return unassignedColors[k] || "";
     }
 
+    // ── 週表示ドラッグ移動 ────────────────────────────────────────────
+    var [weekDragSrc, setWeekDragSrc] = useState(null);  // "dateKey_ci_si"
+    var [weekDragDst, setWeekDragDst] = useState(null);
+    var [weekQuickDrag, setWeekQuickDrag] = useState(false);
+    var [weekGhostName, setWeekGhostName] = useState("");
+    var [weekGhostPos, setWeekGhostPos] = useState({ x: 0, y: 0 });
+    var weekTableRef = useRef(null);
+    var weekMouseSrc = useRef(null);
+    var weekMouseLongPressTimer = useRef(null);
+    var weekMouseDragging = useRef(false);
+    var weekDragDstRef = useRef(null);
+
+    function weekSeatKey(dateKey, ci, si) { return dateKey + "_" + ci + "_" + si; }
+    function parseWeekSeatKey(key) {
+        // key format: "YYYY-MM-DD_ci_si"
+        var lastUnd2 = key.lastIndexOf("_");
+        var si = parseInt(key.slice(lastUnd2 + 1), 10);
+        var tmp = key.slice(0, lastUnd2);
+        var lastUnd1 = tmp.lastIndexOf("_");
+        var ci = parseInt(tmp.slice(lastUnd1 + 1), 10);
+        var dateKey = tmp.slice(0, lastUnd1);
+        return { dateKey: dateKey, ci: ci, si: si };
+    }
+    function doSwapWeekSeats(srcKey, dstKey) {
+        if (!srcKey || !dstKey || srcKey === dstKey) return;
+        var src = parseWeekSeatKey(srcKey);
+        var dst = parseWeekSeatKey(dstKey);
+        var rGk = gridKey(sec.period, sec.dir);
+        setAllGrids(function(prev) {
+            var next = JSON.parse(JSON.stringify(prev));
+            if (!next[src.dateKey]) return prev;
+            if (!next[dst.dateKey]) return prev;
+            if (!next[src.dateKey][rGk]) next[src.dateKey][rGk] = mkGrid();
+            if (!next[dst.dateKey][rGk]) next[dst.dateKey][rGk] = mkGrid();
+            var srcSeat = Object.assign({}, next[src.dateKey][rGk][src.ci][src.si]);
+            var dstSeat = Object.assign({}, next[dst.dateKey][rGk][dst.ci][dst.si]);
+            next[src.dateKey][rGk][src.ci][src.si] = dstSeat;
+            next[dst.dateKey][rGk][dst.ci][dst.si] = srcSeat;
+            return next;
+        });
+    }
+    function handleWeekMouseDown(e, dateKey, ci, si, name) {
+        if (weekColorMode) return;
+        if (e.button !== 0) return;
+        e.preventDefault();
+        var key = weekSeatKey(dateKey, ci, si);
+        weekMouseSrc.current = key;
+        weekMouseDragging.current = false;
+        weekDragDstRef.current = null;
+        weekMouseLongPressTimer.current = setTimeout(function() {
+            weekMouseDragging.current = true;
+            setWeekDragSrc(key);
+            setWeekQuickDrag(true);
+            setWeekGhostName(name);
+            setWeekGhostPos({ x: e.clientX, y: e.clientY });
+        }, 250);
+    }
+    function handleWeekMouseMove(e) {
+        if (!weekMouseDragging.current || !weekTableRef.current) return;
+        setWeekGhostPos({ x: e.clientX, y: e.clientY });
+        var items = weekTableRef.current.querySelectorAll("[data-week-seat-key]");
+        for (var i = 0; i < items.length; i++) {
+            var rect = items[i].getBoundingClientRect();
+            if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                var k = items[i].getAttribute("data-week-seat-key");
+                weekDragDstRef.current = k;
+                setWeekDragDst(k);
+                break;
+            }
+        }
+    }
+    function handleWeekMouseUp() {
+        if (weekMouseLongPressTimer.current) {
+            clearTimeout(weekMouseLongPressTimer.current);
+            weekMouseLongPressTimer.current = null;
+        }
+        if (weekMouseDragging.current) {
+            doSwapWeekSeats(weekMouseSrc.current, weekDragDstRef.current);
+        }
+        weekMouseSrc.current = null;
+        weekMouseDragging.current = false;
+        weekDragDstRef.current = null;
+        setWeekDragSrc(null);
+        setWeekDragDst(null);
+        setWeekQuickDrag(false);
+        setWeekGhostName("");
+    }
+    // ── スマホ タッチ長押しドラッグ ───────────────────────────────────
+    var weekTouchSrc = useRef(null);
+    var weekTouchLongPressTimer = useRef(null);
+    var weekTouchDragging = useRef(false);
+    var weekTouchDstRef = useRef(null);
+    function handleWeekTouchStart(e, dateKey, ci, si, name) {
+        if (weekColorMode) return;
+        var touch = e.touches[0];
+        var key = weekSeatKey(dateKey, ci, si);
+        weekTouchSrc.current = key;
+        weekTouchDragging.current = false;
+        weekTouchDstRef.current = null;
+        weekTouchLongPressTimer.current = setTimeout(function() {
+            weekTouchDragging.current = true;
+            setWeekDragSrc(key);
+            setWeekQuickDrag(true);
+            setWeekGhostName(name);
+            setWeekGhostPos({ x: touch.clientX, y: touch.clientY });
+            if (navigator.vibrate) navigator.vibrate(40);
+        }, 450);
+    }
+    function handleWeekTouchMove(e) {
+        if (!weekTouchDragging.current) {
+            // 長押し前に動いたらキャンセル
+            if (weekTouchLongPressTimer.current) {
+                clearTimeout(weekTouchLongPressTimer.current);
+                weekTouchLongPressTimer.current = null;
+            }
+            return;
+        }
+        e.preventDefault();
+        var touch = e.touches[0];
+        setWeekGhostPos({ x: touch.clientX, y: touch.clientY });
+        if (!weekTableRef.current) return;
+        var items = weekTableRef.current.querySelectorAll("[data-week-seat-key]");
+        for (var i = 0; i < items.length; i++) {
+            var rect = items[i].getBoundingClientRect();
+            if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                var k = items[i].getAttribute("data-week-seat-key");
+                weekTouchDstRef.current = k;
+                setWeekDragDst(k);
+                break;
+            }
+        }
+    }
+    function handleWeekTouchEnd() {
+        if (weekTouchLongPressTimer.current) {
+            clearTimeout(weekTouchLongPressTimer.current);
+            weekTouchLongPressTimer.current = null;
+        }
+        if (weekTouchDragging.current) {
+            doSwapWeekSeats(weekTouchSrc.current, weekTouchDstRef.current);
+        }
+        weekTouchSrc.current = null;
+        weekTouchDragging.current = false;
+        weekTouchDstRef.current = null;
+        setWeekDragSrc(null);
+        setWeekDragDst(null);
+        setWeekQuickDrag(false);
+        setWeekGhostName("");
+    }
+    React.useEffect(function() {
+        if (weekQuickDrag) {
+            document.addEventListener("mousemove", handleWeekMouseMove);
+            document.addEventListener("mouseup", handleWeekMouseUp);
+        }
+        return function() {
+            document.removeEventListener("mousemove", handleWeekMouseMove);
+            document.removeEventListener("mouseup", handleWeekMouseUp);
+        };
+    }, [weekQuickDrag]);
+    React.useEffect(function() {
+        function preventScroll(e) { if (weekQuickDrag) e.preventDefault(); }
+        document.addEventListener("touchmove", preventScroll, { passive: false });
+        return function() { document.removeEventListener("touchmove", preventScroll); };
+    }, [weekQuickDrag]);
+
     // ── ズームコントロール ────────────────────────────────────────────
     var [zoom, setZoom] = useState(1);
     var pinchRef = useRef(null);
@@ -471,6 +637,11 @@ function WeekTable(props) {
     }
 
     return React.createElement("div", { style: { width: "100%", maxWidth: "100%", fontFamily: "sans-serif", boxSizing: "border-box", overflowX: "hidden" } },
+        weekQuickDrag && weekGhostName && React.createElement("div", { style: {
+            position: "fixed", left: weekGhostPos.x - 40, top: weekGhostPos.y - 18, zIndex: 99999,
+            background: "#1e3a5f", color: "white", borderRadius: 8, padding: "4px 10px",
+            fontSize: 13, fontWeight: 700, pointerEvents: "none", boxShadow: "0 4px 16px rgba(0,0,0,.25)",
+        } }, weekGhostName),
         // Section selector + zoom + print + color buttons
         React.createElement("div", { style: { display: "flex", gap: 4, padding: "6px 6px 0", flexWrap: "wrap", alignItems: "center" } },
             WEEK_SECTIONS.map(function(s, i) {
@@ -537,12 +708,12 @@ function WeekTable(props) {
         React.createElement("div", {
             ref: pinchRef,
             onTouchStart: onPinchStart,
-            onTouchMove: onPinchMove,
+            onTouchMove: weekQuickDrag ? undefined : onPinchMove,
             onTouchEnd: onPinchEnd,
             style: { transformOrigin: "top left", transform: "scale(" + zoom + ")", width: (100 / zoom) + "%" }
         },
         // 列幅: 運転者(縦書き)4% | 号車4% | 日付×5 (92%÷5=18.4%ずつ)
-        React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: 6 } },
+        React.createElement("table", { ref: weekTableRef, style: { borderCollapse: "collapse", width: "100%", tableLayout: "fixed", marginTop: 6 } },
             React.createElement("thead", null,
                 React.createElement("tr", null,
                     React.createElement("th", { style: { width: "4%", background: "#1e3a5f", color: "white", fontSize: 8, padding: "4px 1px", border: "1px solid #374151", textAlign: "center", writingMode: "vertical-rl", textOrientation: "upright" } }, "運転者"),
@@ -611,17 +782,27 @@ function WeekTable(props) {
                             var time = seat ? seat.time : "";
                             var seatNo = seat ? seat.seatNo : "";
                             var color = seat ? (seat.color || "") : "";
-                            var bg = COLOR_BG_MAP[color] || (name ? "#f1f8e9" : "#fafafa");
+                            var wsk = weekSeatKey(wd.key, ci, si);
+                            var isSrc = weekDragSrc === wsk;
+                            var isDst = weekDragDst === wsk && weekDragSrc !== wsk;
+                            var bg = isSrc ? "#bfdbfe" : isDst ? "#bbf7d0" : COLOR_BG_MAP[color] || (name ? "#f1f8e9" : "#fafafa");
                             var surname = getSurname(name);
                             var nameFontSize = surname.length >= 4 ? 9 : surname.length === 3 ? 10 : 11;
                             var canPaint = weekColorMode && !!name;
                             return React.createElement("td", { key: wd.key,
+                                "data-week-seat-key": wsk,
                                 onClick: canPaint ? function() { setSeatWeekColor(wd.key, sec.period, sec.dir, ci, si, weekPaintColor); } : undefined,
+                                onMouseDown: name && !weekColorMode ? function(e) { handleWeekMouseDown(e, wd.key, ci, si, name); } : undefined,
+                                onTouchStart: name && !weekColorMode ? function(e) { handleWeekTouchStart(e, wd.key, ci, si, name); } : undefined,
+                                onTouchMove: function(e) { handleWeekTouchMove(e); },
+                                onTouchEnd: handleWeekTouchEnd,
                                 style: {
                                 background: bg, padding: "2px 1px",
-                                border: canPaint ? "1.5px solid #1e3a5f" : "1px solid #e0e7ef",
+                                border: isDst ? "2px solid #059669" : canPaint ? "1.5px solid #1e3a5f" : "1px solid #e0e7ef",
                                 verticalAlign: "middle", textAlign: "center",
-                                cursor: canPaint ? "crosshair" : "default",
+                                cursor: canPaint ? "crosshair" : (name && !weekColorMode ? "grab" : "default"),
+                                opacity: isSrc ? 0.4 : 1,
+                                userSelect: "none", WebkitUserSelect: "none",
                             } },
                                 surname ? React.createElement("div", null,
                                     React.createElement("div", { style: {
@@ -1223,6 +1404,9 @@ function App() {
     var seatGridRef = useRef(null);
     var touchSeatSrc = useRef(null);
     var longPressTimer = useRef(null);
+    var mouseSeatSrc = useRef(null);
+    var mouseLongPressTimer = useRef(null);
+    var mouseQuickDragging = useRef(false);
     var [quickDragMode, setQuickDragMode] = useState(false);
     var [ghostPos, setGhostPos] = useState({ x: 0, y: 0 });
     var [ghostName, setGhostName] = useState("");
@@ -2469,6 +2653,63 @@ function App() {
             longPressTimer.current = null;
         }
     }
+    // ── PC マウス長押しドラッグ ────────────────────────────────────────
+    function handleSeatMouseDown(e, ci, si, name) {
+        if (moveMode || colorEditMode) return;
+        if (e.button !== 0) return; // 左クリックのみ
+        e.preventDefault();
+        var key = seatKey(ci, si);
+        mouseSeatSrc.current = key;
+        mouseQuickDragging.current = false;
+        mouseLongPressTimer.current = setTimeout(function() {
+            mouseQuickDragging.current = true;
+            touchSeatSrc.current = key;
+            setDragSeatSrc(key);
+            setQuickDragMode(true);
+            setGhostName(name);
+            setGhostPos({ x: e.clientX, y: e.clientY });
+        }, 250);
+    }
+    function handleSeatMouseMove(e) {
+        if (!mouseQuickDragging.current || !seatGridRef.current) return;
+        setGhostPos({ x: e.clientX, y: e.clientY });
+        var items = seatGridRef.current.querySelectorAll("[data-seat-key]");
+        for (var i = 0; i < items.length; i++) {
+            var rect = items[i].getBoundingClientRect();
+            if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                setDragSeatSrc(touchSeatSrc.current);
+                setDragSeatDst(items[i].getAttribute("data-seat-key"));
+                break;
+            }
+        }
+    }
+    function handleSeatMouseUp() {
+        if (mouseLongPressTimer.current) {
+            clearTimeout(mouseLongPressTimer.current);
+            mouseLongPressTimer.current = null;
+        }
+        if (mouseQuickDragging.current) {
+            doSwapSeats(touchSeatSrc.current, dragSeatDst);
+        }
+        mouseSeatSrc.current = null;
+        mouseQuickDragging.current = false;
+        touchSeatSrc.current = null;
+        setDragSeatSrc(null);
+        setDragSeatDst(null);
+        setQuickDragMode(false);
+        setGhostName("");
+    }
+    React.useEffect(function() {
+        if (quickDragMode) {
+            document.addEventListener("mousemove", handleSeatMouseMove);
+            document.addEventListener("mouseup", handleSeatMouseUp);
+        }
+        return function() {
+            document.removeEventListener("mousemove", handleSeatMouseMove);
+            document.removeEventListener("mouseup", handleSeatMouseUp);
+        };
+    }, [quickDragMode, dragSeatDst]);
     React.useEffect(function() {
         function preventScroll(e) {
             if (quickDragMode) e.preventDefault();
@@ -3316,7 +3557,7 @@ function App() {
                                             border: (moveMode || isQuickDragging) ? "1.5px solid " + (name ? "#90caf9" : "#cdd5df") : bd,
                                         } },
                                         (moveMode || quickDragMode) && name && (React.createElement("span", { style: { fontSize: 14, color: "#90caf9", flexShrink: 0 } }, "\u283F")),
-                                        React.createElement("div", { onTouchStart: name && !moveMode && !colorEditMode ? function(e) { handleNameLongPressStart(e, ci, si, name); } : undefined, onTouchEnd: handleNameLongPressCancel, onTouchMove: quickDragMode ? undefined : handleNameLongPressCancel,
+                                        React.createElement("div", { onTouchStart: name && !moveMode && !colorEditMode ? function(e) { handleNameLongPressStart(e, ci, si, name); } : undefined, onTouchEnd: handleNameLongPressCancel, onTouchMove: quickDragMode ? undefined : handleNameLongPressCancel, onMouseDown: name && !moveMode && !colorEditMode ? function(e) { handleSeatMouseDown(e, ci, si, name); } : undefined,
                                             onClick: function () {
                                                 if (moveMode) return;
                                                 if (colorEditMode) return;
